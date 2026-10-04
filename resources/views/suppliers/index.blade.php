@@ -1,0 +1,11 @@
+@extends('layouts.app')
+@section('title', 'Suppliers')
+@section('subtitle', 'Manage supplier contacts and preferred purchasing partners.')
+@section('actions')<a class="button button-primary" href="{{ route('suppliers.create') }}">＋ Add supplier</a>@endsection
+@section('content')
+<section class="panel"><div class="toolbar"><form method="GET" class="search-form"><input name="q" value="{{ request('q') }}" placeholder="Search supplier or code…" aria-label="Search suppliers"><button class="button button-secondary">Search</button></form><span class="result-count">{{ $suppliers->total() }} suppliers</span></div>
+<div class="table-wrap"><table><thead><tr><th>SUPPLIER</th><th>CONTACT</th><th>EMAIL / PHONE</th><th>MATERIALS</th><th>STATUS</th><th></th></tr></thead><tbody>
+@forelse($suppliers as $supplier)<tr><td><strong class="table-primary">{{ $supplier->name }}</strong><small class="table-secondary">{{ $supplier->supplier_code }} @if($supplier->tax_number) · Tax {{ $supplier->tax_number }} @endif</small></td><td>{{ $supplier->contact_person ?: '—' }}</td><td>{{ $supplier->email ?: '—' }}<small class="table-secondary">{{ $supplier->phone ?: '' }}</small></td><td>{{ $supplier->materials_count }}</td><td><span class="badge {{ $supplier->is_active ? 'badge-success' : 'badge-neutral' }}">{{ $supplier->is_active ? 'Active' : 'Inactive' }}</span></td><td class="actions-cell"><a class="row-action" href="{{ route('suppliers.edit', $supplier) }}">Edit</a><form method="POST" action="{{ route('suppliers.destroy', $supplier) }}" onsubmit="return confirm('Delete this supplier?')">@csrf @method('DELETE')<button class="row-action danger-link">Delete</button></form></td></tr>
+@empty<tr><td colspan="6"><div class="empty-state"><span class="empty-mark">♧</span><strong>No suppliers yet</strong><p>Add your first supplier to start recording purchases.</p><a class="button button-primary" href="{{ route('suppliers.create') }}">Add supplier</a></div></td></tr>@endforelse
+</tbody></table></div><div class="pagination-wrap">{{ $suppliers->links() }}</div></section>
+@endsection

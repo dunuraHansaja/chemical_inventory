@@ -1,0 +1,10 @@
+@extends('layouts.app')
+@section('title', 'Categories')
+@section('subtitle', 'Organize chemical materials into useful groups.')
+@section('actions')<a class="button button-primary" href="{{ route('categories.create') }}">＋ Add category</a>@endsection
+@section('content')
+<section class="panel"><div class="table-wrap"><table><thead><tr><th>CATEGORY</th><th>DESCRIPTION</th><th>MATERIALS</th><th>STATUS</th><th></th></tr></thead><tbody>
+@forelse($categories as $category)<tr><td><strong class="table-primary">{{ $category->name }}</strong></td><td>{{ $category->description ?: '—' }}</td><td>{{ $category->materials_count }}</td><td><span class="badge {{ $category->is_active ? 'badge-success' : 'badge-neutral' }}">{{ $category->is_active ? 'Active' : 'Inactive' }}</span></td><td class="actions-cell"><a class="row-action" href="{{ route('categories.edit', $category) }}">Edit</a><form method="POST" action="{{ route('categories.destroy', $category) }}" onsubmit="return confirm('Delete this category?')">@csrf @method('DELETE')<button class="row-action danger-link">Delete</button></form></td></tr>
+@empty<tr><td colspan="5"><div class="empty-state"><strong>No categories yet</strong><p>Create categories to group materials.</p></div></td></tr>@endforelse
+</tbody></table></div><div class="pagination-wrap">{{ $categories->links() }}</div></section>
+@endsection

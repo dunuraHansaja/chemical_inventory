@@ -1,0 +1,14 @@
+@extends('layouts.app')
+@section('title', 'Lots & expiry')
+@section('subtitle', 'Trace material quantities by batch and stay ahead of expiry dates.')
+@section('actions')<a class="button button-secondary" href="{{ route('adjustments.create') }}">± Adjust stock</a><a class="button button-primary" href="{{ route('lots.create') }}">＋ Receive lot</a>@endsection
+@section('content')
+<section class="panel"><div class="toolbar"><div class="filter-tabs"><a class="{{ request('filter') ? '' : 'selected' }}" href="{{ route('lots.index') }}">All lots</a><a class="{{ request('filter') === 'expiring' ? 'selected' : '' }}" href="{{ route('lots.index', ['filter' => 'expiring']) }}">Expiring soon</a><a class="{{ request('filter') === 'expired' ? 'selected' : '' }}" href="{{ route('lots.index', ['filter' => 'expired']) }}">Expired</a><a class="{{ request('filter') === 'out' ? 'selected' : '' }}" href="{{ route('lots.index', ['filter' => 'out']) }}">Depleted</a></div><span class="result-count">{{ $lots->total() }} lots</span></div>
+<div class="table-wrap"><table><thead><tr><th>MATERIAL / LOT</th><th>MANUFACTURED</th><th>EXPIRY</th><th>RECEIVED</th><th>ON HAND</th><th>UNIT COST</th><th>STATUS</th></tr></thead><tbody>
+@forelse($lots as $lot)
+@php($expired = $lot->expiry_date && $lot->expiry_date->lt(today()))
+@php($expiringSoon = $lot->expiry_date && !$expired && $lot->expiry_date->lte(today()->addDays(90)))
+<tr><td><a class="table-primary" href="{{ route('materials.show', $lot->material) }}">{{ $lot->material->name }}</a><small class="table-secondary">{{ $lot->lot_number }} · {{ $lot->material->item_code }}</small></td><td>{{ $lot->manufactured_date?->format('d M Y') ?? '—' }}</td><td>{{ $lot->expiry_date?->format('d M Y') ?? 'No expiry' }}</td><td>{{ number_format((float)$lot->quantity_received, 3) }} {{ $lot->material->stock_unit }}</td><td><strong>{{ number_format((float)$lot->quantity_on_hand, 3) }}</strong> {{ $lot->material->stock_unit }}</td><td>{{ $lot->unit_cost === null ? '—' : $inventorySettings['currency_symbol'].number_format((float)$lot->unit_cost, 2) }}</td><td>@if($expired)<span class="badge badge-danger">Expired</span>@elseif($expiringSoon)<span class="badge badge-warning">Expiring soon</span>@elseif((float)$lot->quantity_on_hand <= 0)<span class="badge badge-neutral">Depleted</span>@else<span class="badge badge-success">Available</span>@endif</td></tr>
+@empty<tr><td colspan="7"><div class="empty-state"><span class="empty-mark">▦</span><strong>No lots found</strong><p>Received batches will appear here.</p></div></td></tr>@endforelse
+</tbody></table></div><div class="pagination-wrap">{{ $lots->links() }}</div></section>
+@endsection
