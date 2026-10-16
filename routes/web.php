@@ -25,6 +25,7 @@ Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->n
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
+    Route::get('/materials/print', [MaterialController::class, 'print'])->name('materials.print');
     Route::get('/materials/export', [MaterialController::class, 'export'])->name('materials.export');
     Route::post('/materials/import', [MaterialController::class, 'import'])->name('materials.import');
     Route::resource('materials', MaterialController::class)->except('destroy')->names('materials');

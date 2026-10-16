@@ -7,7 +7,7 @@
     <title>@yield('title', 'Dashboard') · ChemStock</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body>
+<body class="@yield('page-class')">
     <div class="app-shell">
         <aside class="sidebar">
             <a class="brand" href="{{ route('dashboard') }}">
@@ -36,7 +36,14 @@
         </aside>
         <main class="main-area">
             <header class="topbar">
-                <div class="breadcrumb">Workspace <span>/</span> @yield('title', 'Dashboard')</div>
+                @if (request()->routeIs('materials.index'))
+                    <form class="materials-global-search" method="GET" action="{{ route('materials.index') }}">
+                        <span aria-hidden="true">⌕</span>
+                        <input type="search" name="q" value="{{ request('q') }}" placeholder="Search materials, CAS no., code…" aria-label="Search materials, CAS number or code">
+                    </form>
+                @else
+                    <div class="breadcrumb">Workspace <span>/</span> @yield('title', 'Dashboard')</div>
+                @endif
                 <div class="topbar-user">
                     <span class="user-avatar">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span>
                     <span class="user-name">{{ auth()->user()->name }}</span>
@@ -48,19 +55,12 @@
                     <div><span class="eyebrow">@yield('eyebrow', 'CHEMICAL INVENTORY')</span><h1>@yield('title', 'Dashboard')</h1><p>@yield('subtitle')</p></div>
                     <div class="page-actions">@yield('actions')</div>
                 </div>
-                @if (session('success'))
-                    <div class="alert alert-success" role="status">{{ session('success') }}</div>
-                @endif
-                @if ($errors->any())
-                    <div class="alert alert-error" role="alert">
-                        <strong>Please check the following:</strong>
-                        <ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
-                    </div>
-                @endif
+                @include('components.flash-messages')
                 @yield('content')
                 <footer class="page-footer">ChemStock <span>·</span> Inventory operations, clearly in control.</footer>
             </div>
         </main>
     </div>
+    @include('components.confirmation-dialog')
 </body>
 </html>

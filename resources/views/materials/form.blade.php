@@ -3,7 +3,7 @@
 @section('subtitle', 'Maintain accurate identifiers, safety details and stock thresholds.')
 @section('actions')<a class="button button-secondary" href="{{ $material->exists ? route('materials.show', $material) : route('materials.index') }}">← Back</a>@endsection
 @section('content')
-    <form method="POST" action="{{ $material->exists ? route('materials.update', $material) : route('materials.store') }}" class="panel form-panel">
+    <form method="POST" action="{{ $material->exists ? route('materials.update', $material) : route('materials.store') }}" class="panel form-panel" data-confirm="{{ $material->exists ? 'Save changes to this material? The updated details will be reflected in your inventory.' : 'Are you sure you want to add this material? It will be saved to your inventory.' }}" data-confirm-title="{{ $material->exists ? 'Save material changes?' : 'Add this material?' }}" data-confirm-action="{{ $material->exists ? 'Save Changes' : 'Add Material' }}" data-confirm-tone="primary">
         @csrf @if($material->exists)@method('PUT')@endif
         <div class="form-section"><span class="eyebrow">IDENTIFICATION</span><h2>Material details</h2><div class="form-grid">
             <label>Item code <span class="required">*</span><input name="item_code" value="{{ old('item_code', $material->item_code) }}" maxlength="50" required></label>

@@ -192,6 +192,130 @@ class InventoryWorkflowTest extends TestCase
         $this->get('/materials/export')->assertOk()->assertHeader('content-disposition', 'attachment; filename=materials.csv');
     }
 
+    public function test_materials_page_uses_database_stock_data_for_summaries_filters_and_table(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $category = Category::create(['name' => 'Raw Materials', 'is_active' => true]);
+        $supplier = Supplier::create(['supplier_code' => 'SUP-MAT', 'name' => 'Regional Chemical Supply', 'is_active' => true]);
+
+        $inStock = Material::create([
+            'item_code' => 'RM-001',
+            'name' => 'Sodium hydroxide',
+            'cas_number' => '1310-73-2',
+            'category_id' => $category->id,
+            'preferred_supplier_id' => $supplier->id,
+            'storage_location' => 'Acid store, Bay 2',
+            'stock_unit' => 'kg',
+            'reorder_level' => 10,
+            'is_active' => true,
+        ]);
+        MaterialLot::create([
+            'material_id' => $inStock->id,
+            'lot_number' => 'LOT-RM-001',
+            'expiry_date' => today()->addDays(30),
+            'quantity_received' => 20,
+            'quantity_on_hand' => 20,
+            'status' => 'active',
+        ]);
+
+        $lowStock = Material::create([
+            'item_code' => 'RM-002',
+            'name' => 'Glutaraldehyde',
+            'category_id' => $category->id,
+            'stock_unit' => 'L',
+            'reorder_level' => 10,
+            'is_active' => true,
+        ]);
+        MaterialLot::create([
+            'material_id' => $lowStock->id,
+            'lot_number' => 'LOT-RM-002',
+            'quantity_received' => 4,
+            'quantity_on_hand' => 4,
+            'status' => 'active',
+        ]);
+
+        Material::create([
+            'item_code' => 'RM-003',
+            'name' => 'Out of stock reagent',
+            'category_id' => $category->id,
+            'stock_unit' => 'kg',
+            'reorder_level' => 2,
+            'is_active' => true,
+        ]);
+
+        $this->get('/materials')
+            ->assertOk()
+            ->assertSee('Total Materials')
+            ->assertSee('In Stock')
+            ->assertSee('Low Stock')
+            ->assertSee('Out of Stock')
+            ->assertSee('Expiring Soon')
+            ->assertSee('1310-73-2')
+            ->assertSee(today()->addDays(30)->toDateString())
+            ->assertSee('Acid store, Bay 2')
+            ->assertSee('Raw Materials')
+            ->assertSee('3 materials');
+
+        $this->get('/materials?status=low_stock')
+            ->assertOk()
+            ->assertSee('Glutaraldehyde')
+            ->assertDontSee('Sodium hydroxide');
+        $this->get('/materials?category_id='.$category->id.'&q=Regional%20Chemical')
+            ->assertOk()
+            ->assertSee('Sodium hydroxide');
+        $this->get('/materials?status=out_of_stock')
+            ->assertOk()
+            ->assertSee('Out of stock reagent')
+            ->assertDontSee('Glutaraldehyde');
+        $this->get('/materials?per_page=25&sort=code&direction=desc')
+            ->assertOk()
+            ->assertSee('value="25" selected', false);
+    }
+
+    public function test_material_stock_sheet_print_and_selected_csv_export_use_database_values(): void
+    {
+        $this->actingAs(User::factory()->create());
+        $first = Material::create([
+            'item_code' => 'SHEET-001',
+            'name' => 'Print test material',
+            'cas_number' => '123-45-6',
+            'storage_location' => 'Cabinet A',
+            'stock_unit' => 'kg',
+            'reorder_level' => 1,
+            'is_active' => true,
+        ]);
+        MaterialLot::create([
+            'material_id' => $first->id,
+            'lot_number' => 'SHEET-LOT-001',
+            'expiry_date' => today()->addDays(45),
+            'quantity_received' => 8,
+            'quantity_on_hand' => 8,
+            'status' => 'active',
+        ]);
+        Material::create([
+            'item_code' => 'SHEET-002',
+            'name' => 'Not selected material',
+            'stock_unit' => 'L',
+            'reorder_level' => 0,
+            'is_active' => true,
+        ]);
+
+        $this->get('/materials/print?ids[]='.$first->id)
+            ->assertOk()
+            ->assertSee('Materials stock sheet')
+            ->assertSee('Print test material')
+            ->assertSee('123-45-6')
+            ->assertDontSee('Not selected material');
+
+        $export = $this->get('/materials/export?ids[]='.$first->id)
+            ->assertOk()
+            ->assertHeader('content-disposition', 'attachment; filename=materials.csv');
+        $content = $export->streamedContent();
+        $this->assertStringContainsString('Print test material', $content);
+        $this->assertStringContainsString('Cabinet A', $content);
+        $this->assertStringNotContainsString('Not selected material', $content);
+    }
+
     public function test_purchase_receipt_creates_stock_lot_and_audited_movement(): void
     {
         $user = User::factory()->create();
