@@ -132,6 +132,8 @@ class ProductionController extends Controller
             return $order;
         });
 
-        return redirect()->route('production.index')->with('success', "Production {$order->order_number} completed and stock updated.");
+        return redirect()->route('production.index')
+            ->with('success_title', 'Production Completed')
+            ->with('success', "Production {$order->order_number} was completed and stock updated.");
     }
 }

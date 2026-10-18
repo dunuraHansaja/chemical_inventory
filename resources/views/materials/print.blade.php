@@ -3,7 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Materials stock sheet · ChemStock</title>
+    <link rel="icon" type="image/png" href="{{ asset('images/inventroo-icon.png') }}">
+    <title>INVENTROO</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@100..900&display=swap');
@@ -14,7 +15,7 @@
         .print-actions { margin-bottom: 18px; }
         table { width: 100%; border-collapse: collapse; }
         th, td { border: 1px solid #d9e1e8; padding: 8px; text-align: left; }
-        th { background: #f0f4f8; font-size: calc(10px * 1.15); text-transform: uppercase; }
+        th { border-color: #dce7f4; color: #27466f; background: linear-gradient(180deg, #f0f6ff 0%, #e7f0fc 100%); font-size: calc(10px * 1.15); font-weight: 700; letter-spacing: .35px; text-transform: uppercase; }
         @media print {
             body { margin: 0; }
             .print-actions { display: none; }

@@ -31,7 +31,7 @@
         <div class="toast toast-error" role="alert" data-toast-persistent>
             <span class="toast-icon" aria-hidden="true">×</span>
             <div class="toast-copy">
-                <strong>Please review the following</strong>
+                <strong>Please correct the following issues</strong>
                 <ul>@foreach ($errors->all() as $error)<li>{{ $error }}</li>@endforeach</ul>
             </div>
             <button class="toast-close" type="button" aria-label="Dismiss notification">×</button>

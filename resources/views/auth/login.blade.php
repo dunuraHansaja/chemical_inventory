@@ -2,11 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sign in · ChemStock</title>@vite(['resources/css/app.css', 'resources/js/app.js'])
+    <link rel="icon" type="image/png" href="{{ asset('images/inventroo-icon.png') }}">
+    <title>Sign in · INVENTROO</title>@vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="auth-page">
     <section class="auth-card">
-        <a class="brand auth-brand" href="{{ route('login') }}"><span class="brand-mark">C</span><span><strong>ChemStock</strong><small>INVENTORY SYSTEM</small></span></a>
+        <a class="brand auth-brand" href="{{ route('login') }}"><img class="brand-logo" src="{{ asset('images/inventroo-logo.png') }}" alt="INVENTROO — Inventory Management Platform"></a>
         <span class="eyebrow">WELCOME BACK</span><h1>Sign in to your workspace</h1><p class="muted">Manage your materials, stock and operations in one place.</p>
         @include('components.flash-messages')
         <form method="POST" action="{{ route('login.store') }}" class="form-stack">@csrf

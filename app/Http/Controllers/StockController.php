@@ -73,7 +73,9 @@ class StockController extends Controller
             ]);
         });
 
-        return redirect()->route('lots.index')->with('success', 'Lot created and opening stock recorded.');
+        return redirect()->route('lots.index')
+            ->with('success_title', 'Stock Lot Added')
+            ->with('success', "Lot “{$data['lot_number']}” was added and opening stock recorded.");
     }
 
     public function adjustments(): View
@@ -115,7 +117,9 @@ class StockController extends Controller
             ]);
         });
 
-        return redirect()->route('movements.index')->with('success', 'Stock adjustment recorded.');
+        return redirect()->route('movements.index')
+            ->with('success_title', 'Stock Adjustment Recorded')
+            ->with('success', 'The stock adjustment was recorded successfully.');
     }
 
     public function movements(Request $request): View

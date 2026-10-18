@@ -47,7 +47,9 @@ class PurchaseOrderController extends Controller
             return $order;
         });
 
-        return redirect()->route('purchases.show', $order)->with('success', 'Purchase order saved as a draft.');
+        return redirect()->route('purchases.show', $order)
+            ->with('success_title', 'Purchase Order Added')
+            ->with('success', "Purchase order {$order->order_number} was saved as a draft.");
     }
 
     public function show(PurchaseOrder $purchase): View
@@ -94,7 +96,8 @@ class PurchaseOrderController extends Controller
 
         $purchase->delete();
 
-        return redirect()->route('purchases.index')->with('success', 'Draft purchase deleted.');
+        return redirect()->route('purchases.index')
+            ->with('warning', "Draft purchase {$purchase->order_number} was deleted.");
     }
 
     public function receive(Request $request, PurchaseOrder $purchase): RedirectResponse
@@ -137,7 +140,9 @@ class PurchaseOrderController extends Controller
             $purchase->update(['status' => 'received']);
         });
 
-        return redirect()->route('purchases.show', $purchase)->with('success', 'Purchase received and stock lots created.');
+        return redirect()->route('purchases.show', $purchase)
+            ->with('success_title', 'Stock Received')
+            ->with('success', 'Purchase received and stock lots created.');
     }
 
     private function validated(Request $request): array

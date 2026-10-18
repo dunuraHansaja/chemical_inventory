@@ -32,11 +32,16 @@ class InventoryWorkflowTest extends TestCase
         $this->get('/setup')->assertRedirect('/dashboard');
         $this->assertDatabaseHas('users', ['email' => 'admin@example.test']);
         $this->assertDatabaseHas('inventory_settings', ['key' => 'administrator_initialized', 'value' => 'true']);
+        $admin = User::where('email', 'admin@example.test')->firstOrFail();
+        $this->assertTrue($admin->role->is_system);
+        $this->assertTrue($admin->hasPermission('dashboard.view'));
     }
 
     public function test_material_catalogue_crud_and_authenticated_dashboard_are_available(): void
     {
         $user = User::factory()->create();
+        $this->assertDatabaseHas('roles', ['id' => $user->role_id, 'is_system' => true]);
+        $this->assertTrue($user->hasPermission('dashboard.view'));
         $this->actingAs($user);
 
         $category = Category::create(['name' => 'Solvents', 'is_active' => true]);
@@ -54,11 +59,14 @@ class InventoryWorkflowTest extends TestCase
             'cost_per_unit' => 10.50,
             'hazard_classes' => 'Flammable, Irritant',
             'is_active' => '1',
-        ])->assertRedirect();
+        ])->assertRedirect()
+            ->assertSessionHas('success_title', 'Material Added')
+            ->assertSessionHas('success', 'The material “Ethanol” was added successfully.');
 
         $material = Material::where('item_code', 'ETH-001')->firstOrFail();
         $this->assertSame(['Flammable', 'Irritant'], $material->hazard_classes);
         $this->get('/materials/'.$material->id)->assertOk()->assertSee('Ethanol')->assertSee('Flammable, Irritant');
+        $this->get('/materials/'.$material->id.'/edit')->assertOk()->assertSee('data-confirm', false);
 
         $this->put('/materials/'.$material->id, [
             'item_code' => 'ETH-001',
@@ -104,13 +112,26 @@ class InventoryWorkflowTest extends TestCase
 
         $this->from('/settings')->put('/settings', [
             'currency_code' => 'EUR',
-            'currency_symbol' => '€',
+            'currency_symbol' => 'not-the-euro-symbol',
             'vat_rate' => 21,
         ])->assertRedirect('/settings');
 
+        $this->assertDatabaseHas('inventory_settings', ['key' => 'currency_code', 'value' => 'EUR']);
+        $this->assertDatabaseHas('inventory_settings', ['key' => 'currency_symbol', 'value' => '€']);
         $this->assertDatabaseHas('inventory_settings', ['key' => 'vat_rate', 'value' => '21']);
         $this->get('/purchases/create')->assertOk()->assertSee('value="21"', false);
         $this->get('/dashboard')->assertOk()->assertSee('EUR');
+        $this->get('/settings')->assertOk()
+            ->assertSee('<select id="currency-code" name="currency_code" data-currency-code', false)
+            ->assertSee('<option value="EUR" data-symbol="€" selected>', false)
+            ->assertSee('id="currency-symbol" name="currency_symbol" value="€" data-currency-symbol readonly', false)
+            ->assertSee('data-confirm', false);
+
+        $this->from('/settings')->put('/settings', [
+            'currency_code' => 'XYZ',
+            'vat_rate' => 21,
+        ])->assertRedirect('/settings')->assertSessionHasErrors('currency_code');
+        $this->assertDatabaseHas('inventory_settings', ['key' => 'currency_code', 'value' => 'EUR']);
     }
 
     public function test_supplier_and_category_records_can_be_created_updated_and_deleted_when_unused(): void
@@ -121,23 +142,49 @@ class InventoryWorkflowTest extends TestCase
             'supplier_code' => 'SUP-CRUD',
             'name' => 'Initial supplier',
             'is_active' => '1',
-        ])->assertRedirect('/suppliers');
+        ])->assertRedirect('/suppliers')
+            ->assertSessionHas('success_title', 'Supplier Added');
         $supplier = Supplier::where('supplier_code', 'SUP-CRUD')->firstOrFail();
+        $this->get('/suppliers/'.$supplier->id.'/edit')->assertOk()->assertSee('data-confirm', false);
+        $this->get('/suppliers')->assertOk()->assertSee('data-confirm', false);
         $this->put('/suppliers/'.$supplier->id, [
             'supplier_code' => 'SUP-CRUD',
             'name' => 'Updated supplier',
             'is_active' => '1',
         ])->assertRedirect('/suppliers');
         $this->assertDatabaseHas('suppliers', ['id' => $supplier->id, 'name' => 'Updated supplier']);
-        $this->delete('/suppliers/'.$supplier->id)->assertRedirect('/suppliers');
+        $this->delete('/suppliers/'.$supplier->id)
+            ->assertRedirect('/suppliers')
+            ->assertSessionHas('warning', 'The supplier “Updated supplier” was deleted.');
         $this->assertDatabaseMissing('suppliers', ['id' => $supplier->id]);
 
-        $this->post('/categories', ['name' => 'Initial category', 'is_active' => '1'])->assertRedirect('/categories');
+        $this->post('/categories', ['name' => 'Initial category', 'is_active' => '1'])
+            ->assertRedirect('/categories')
+            ->assertSessionHas('success_title', 'Category Added');
         $category = Category::where('name', 'Initial category')->firstOrFail();
+        $this->get('/categories/'.$category->id.'/edit')->assertOk()->assertSee('data-confirm', false);
+        $this->get('/categories')->assertOk()->assertSee('data-confirm', false);
         $this->put('/categories/'.$category->id, ['name' => 'Updated category', 'is_active' => '1'])->assertRedirect('/categories');
         $this->assertDatabaseHas('categories', ['id' => $category->id, 'name' => 'Updated category']);
-        $this->delete('/categories/'.$category->id)->assertRedirect('/categories');
+        $this->delete('/categories/'.$category->id)
+            ->assertRedirect('/categories')
+            ->assertSessionHas('warning', 'The category “Updated category” was deleted.');
         $this->assertDatabaseMissing('categories', ['id' => $category->id]);
+    }
+
+    public function test_invalid_record_creation_shows_relevant_error_notification(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $this->followingRedirects()
+            ->from('/categories/create')
+            ->post('/categories', ['name' => ''])
+            ->assertOk()
+            ->assertSee('toast-error', false)
+            ->assertSee('Please correct the following issues')
+            ->assertSee('The name field is required.');
+
+        $this->assertDatabaseCount('categories', 0);
     }
 
     public function test_stock_receipts_and_adjustments_update_the_lot_and_reject_negative_balance(): void
@@ -155,7 +202,8 @@ class InventoryWorkflowTest extends TestCase
             'lot_number' => 'BATCH-001',
             'quantity_received' => 10,
             'unit_cost' => 3.5,
-        ])->assertRedirect('/lots');
+        ])->assertRedirect('/lots')
+            ->assertSessionHas('success_title', 'Stock Lot Added');
 
         $lot = MaterialLot::where('lot_number', 'BATCH-001')->firstOrFail();
         $this->post('/stock/adjustments', [
@@ -163,7 +211,8 @@ class InventoryWorkflowTest extends TestCase
             'direction' => 'out',
             'quantity' => 2.5,
             'notes' => 'Damaged container',
-        ])->assertRedirect('/stock/movements');
+        ])->assertRedirect('/stock/movements')
+            ->assertSessionHas('success_title', 'Stock Adjustment Recorded');
         $this->assertSame('7.500', $lot->fresh()->quantity_on_hand);
 
         $this->post('/stock/adjustments', [
@@ -185,7 +234,8 @@ class InventoryWorkflowTest extends TestCase
                 'materials.csv',
                 "item_code,name,stock_unit,reorder_level,category\nCSV-001,Imported chemical,kg,2,Reagents\n",
             ),
-        ])->assertRedirect('/materials');
+        ])->assertRedirect('/materials')
+            ->assertSessionHas('success_title', 'Materials Imported');
         $this->assertDatabaseHas('materials', ['item_code' => 'CSV-001', 'name' => 'Imported chemical']);
         $this->assertDatabaseHas('categories', ['name' => 'Reagents']);
 
@@ -245,6 +295,8 @@ class InventoryWorkflowTest extends TestCase
 
         $this->get('/materials')
             ->assertOk()
+            ->assertSee('mobile-bottom-nav', false)
+            ->assertSee('mobile-menu-toggle', false)
             ->assertSee('Total Materials')
             ->assertSee('In Stock')
             ->assertSee('Low Stock')
@@ -253,6 +305,9 @@ class InventoryWorkflowTest extends TestCase
             ->assertSee('1310-73-2')
             ->assertSee(today()->addDays(30)->toDateString())
             ->assertSee('Acid store, Bay 2')
+            ->assertSee('data-label="CAS No."', false)
+            ->assertSee('data-label="On Hand"', false)
+            ->assertSee('data-label="Status"', false)
             ->assertSee('Raw Materials')
             ->assertSee('3 materials');
 
@@ -269,7 +324,10 @@ class InventoryWorkflowTest extends TestCase
             ->assertDontSee('Glutaraldehyde');
         $this->get('/materials?per_page=25&sort=code&direction=desc')
             ->assertOk()
-            ->assertSee('value="25" selected', false);
+            ->assertSee('value="25" selected', false)
+            ->assertSee('<th>Code</th>', false)
+            ->assertDontSee('materials-sort-link')
+            ->assertDontSee('aria-sort');
     }
 
     public function test_material_stock_sheet_print_and_selected_csv_export_use_database_values(): void
@@ -302,6 +360,7 @@ class InventoryWorkflowTest extends TestCase
 
         $this->get('/materials/print?ids[]='.$first->id)
             ->assertOk()
+            ->assertSee('<title>INVENTROO</title>', false)
             ->assertSee('Materials stock sheet')
             ->assertSee('Print test material')
             ->assertSee('123-45-6')
@@ -333,11 +392,15 @@ class InventoryWorkflowTest extends TestCase
             'ordered_at' => today()->toDateString(),
             'vat_rate' => 15,
             'items' => [['material_id' => $material->id, 'quantity' => 12.5, 'unit_cost' => 4.25]],
-        ])->assertRedirect();
-
+        ])->assertRedirect()
+            ->assertSessionHas('success_title', 'Purchase Order Added');
         $purchase = PurchaseOrder::firstOrFail();
         $this->assertSame('draft', $purchase->status);
-        $this->post('/purchases/'.$purchase->id.'/receive')->assertRedirect();
+        $this->get('/purchases/'.$purchase->id.'/edit')->assertOk()->assertSee('data-confirm', false);
+        $this->get('/purchases/'.$purchase->id)->assertOk()->assertSee('data-confirm', false);
+        $this->post('/purchases/'.$purchase->id.'/receive')
+            ->assertRedirect()
+            ->assertSessionHas('success_title', 'Stock Received');
 
         $purchase->refresh();
         $this->assertSame('received', $purchase->status);
@@ -388,7 +451,8 @@ class InventoryWorkflowTest extends TestCase
             'notes' => 'Test batch',
             'inputs' => [['material_id' => $input->id, 'quantity' => 3]],
             'outputs' => [['material_id' => $output->id, 'quantity' => 2]],
-        ])->assertRedirect('/production');
+        ])->assertRedirect('/production')
+            ->assertSessionHas('success_title', 'Production Completed');
 
         $this->assertSame('5.000', $expired->fresh()->quantity_on_hand);
         $this->assertSame('1.000', $available->fresh()->quantity_on_hand);

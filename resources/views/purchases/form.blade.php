@@ -4,7 +4,7 @@
 @section('actions')<a class="button button-secondary" href="{{ $purchase->exists ? route('purchases.show', $purchase) : route('purchases.index') }}">← Cancel</a>@endsection
 @section('content')
 @php($formItems = old('items', $purchase->items->isNotEmpty() ? $purchase->items->map(fn($item) => ['material_id' => $item->material_id, 'quantity' => $item->quantity, 'unit_cost' => $item->unit_cost])->all() : [['material_id' => '', 'quantity' => '', 'unit_cost' => '']]))
-<form method="POST" action="{{ $purchase->exists ? route('purchases.update', $purchase) : route('purchases.store') }}" class="panel form-panel">@csrf @if($purchase->exists)@method('PUT')@endif
+<form method="POST" action="{{ $purchase->exists ? route('purchases.update', $purchase) : route('purchases.store') }}" class="panel form-panel" @if($purchase->exists) data-confirm="Save changes to draft purchase {{ $purchase->order_number }}?" data-confirm-title="Save purchase changes?" data-confirm-action="Save Changes" data-confirm-tone="primary" @endif>@csrf @if($purchase->exists)@method('PUT')@endif
 <div class="form-section"><span class="eyebrow">SUPPLIER ORDER</span><h2>Order details</h2><div class="form-grid">
 <label>Supplier <span class="required">*</span><select name="supplier_id" required><option value="">Select supplier</option>@foreach($suppliers as $supplier)<option value="{{ $supplier->id }}" @selected(old('supplier_id', $purchase->supplier_id) == $supplier->id)>{{ $supplier->name }}</option>@endforeach</select></label>
 <label>Order date <span class="required">*</span><input type="date" name="ordered_at" value="{{ old('ordered_at', $purchase->ordered_at?->format('Y-m-d')) }}" required></label>

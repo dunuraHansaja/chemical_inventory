@@ -30,7 +30,9 @@ class SupplierController extends Controller
     {
         $supplier = Supplier::create($this->validated($request));
 
-        return redirect()->route('suppliers.index')->with('success', 'Supplier created.');
+        return redirect()->route('suppliers.index')
+            ->with('success_title', 'Supplier Added')
+            ->with('success', "The supplier “{$supplier->name}” was added successfully.");
     }
 
     public function edit(Supplier $supplier): View
@@ -53,7 +55,8 @@ class SupplierController extends Controller
 
         $supplier->delete();
 
-        return redirect()->route('suppliers.index')->with('success', 'Supplier deleted.');
+        return redirect()->route('suppliers.index')
+            ->with('warning', "The supplier “{$supplier->name}” was deleted.");
     }
 
     private function validated(Request $request, ?Supplier $supplier = null): array

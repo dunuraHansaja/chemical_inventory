@@ -59,7 +59,7 @@ If you discover a security vulnerability within Laravel, please send an e-mail t
 The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
 ## Chemical Inventory System
 
-ChemStock is a Laravel inventory application for chemical materials, supplier purchasing, lot/expiry tracking, production consumption, stock adjustments and purchase VAT.
+INVENTROO is a Laravel inventory application for chemical materials, supplier purchasing, lot/expiry tracking, production consumption, stock adjustments and purchase VAT.
 
 ### Start the application
 

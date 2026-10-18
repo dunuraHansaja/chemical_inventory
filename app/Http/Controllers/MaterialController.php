@@ -118,7 +118,8 @@ class MaterialController extends Controller
 
         $material->delete();
 
-        return redirect()->route('materials.index')->with('success', 'Material archived.');
+        return redirect()->route('materials.index')
+            ->with('warning', "The material “{$material->name}” was archived.");
     }
 
     public function export(Request $request): StreamedResponse
@@ -314,7 +315,9 @@ class MaterialController extends Controller
         });
         fclose($handle);
 
-        return redirect()->route('materials.index')->with('success', "{$count} materials imported.");
+        return redirect()->route('materials.index')
+            ->with('success_title', 'Materials Imported')
+            ->with('success', "{$count} materials were imported successfully.");
     }
 
     private function validated(Request $request, ?Material $material = null): array

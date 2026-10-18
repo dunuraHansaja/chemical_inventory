@@ -1,5 +1,26 @@
 import './bootstrap';
 
+const mobileMenuToggle = document.querySelector('[data-mobile-menu-toggle]');
+const appShell = document.querySelector('.app-shell');
+
+const setMobileMenuOpen = (open) => {
+    if (!appShell || !(mobileMenuToggle instanceof HTMLButtonElement)) return;
+    appShell.classList.toggle('mobile-menu-open', open);
+    mobileMenuToggle.setAttribute('aria-expanded', String(open));
+    mobileMenuToggle.setAttribute('aria-label', open ? 'Close navigation menu' : 'Open navigation menu');
+};
+
+mobileMenuToggle?.addEventListener('click', () => {
+    setMobileMenuOpen(!appShell?.classList.contains('mobile-menu-open'));
+});
+document.querySelector('[data-mobile-menu-close]')?.addEventListener('click', () => setMobileMenuOpen(false));
+document.querySelector('.sidebar .main-nav')?.addEventListener('click', (event) => {
+    if (event.target.closest('a')) setMobileMenuOpen(false);
+});
+document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') setMobileMenuOpen(false);
+});
+
 const updateMaterialsSelectionCount = () => {
     const count = document.querySelector('[data-selection-count]');
     if (!count) return;
@@ -159,6 +180,15 @@ document.addEventListener('click', (event) => {
 document.addEventListener('change', (event) => {
     const target = event.target;
     if (!(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) return;
+
+    if (target.matches('[data-currency-code]')) {
+        const symbolInput = document.querySelector('[data-currency-symbol]');
+        const selectedOption = target.selectedOptions[0];
+        if (symbolInput instanceof HTMLInputElement && selectedOption) {
+            symbolInput.value = selectedOption.dataset.symbol || '';
+        }
+        return;
+    }
 
     if (target.matches('[data-select-all]')) {
         document.querySelectorAll('[data-material-row]').forEach((checkbox) => {

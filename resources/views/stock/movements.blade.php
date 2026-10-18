@@ -1,7 +1,7 @@
 @extends('layouts.app')
 @section('title', 'Stock movements')
 @section('subtitle', 'An auditable ledger of receipts, consumption and inventory corrections.')
-@section('actions')<a class="button button-secondary" href="{{ route('adjustments.create') }}">± Adjust stock</a>@endsection
+@section('actions')@if(auth()->user()->hasPermission('adjustments.create'))<a class="button button-secondary" href="{{ route('adjustments.create') }}">± Adjust stock</a>@endif @endsection
 @section('content')
 <section class="panel"><div class="toolbar"><form method="GET" class="search-form"><input name="q" value="{{ request('q') }}" placeholder="Search materials…" aria-label="Search movement materials"><select name="type" aria-label="Filter movement type"><option value="">All movement types</option>@foreach(['opening_stock','purchase_receipt','production_consumption','production_output','adjustment_in','adjustment_out'] as $type)<option value="{{ $type }}" @selected(request('type') === $type)>{{ str_replace('_', ' ', $type) }}</option>@endforeach</select><button class="button button-secondary">Filter</button></form><span class="result-count">{{ $movements->total() }} records</span></div>
 <div class="table-wrap"><table><thead><tr><th>DATE</th><th>MATERIAL</th><th>TYPE / REFERENCE</th><th>QUANTITY</th><th>LOT BALANCE</th><th>RECORDED BY</th><th>NOTES</th></tr></thead><tbody>

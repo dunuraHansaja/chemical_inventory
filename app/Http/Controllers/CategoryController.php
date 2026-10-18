@@ -24,9 +24,11 @@ class CategoryController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        Category::create($this->validated($request));
+        $category = Category::create($this->validated($request));
 
-        return redirect()->route('categories.index')->with('success', 'Category created.');
+        return redirect()->route('categories.index')
+            ->with('success_title', 'Category Added')
+            ->with('success', "The category “{$category->name}” was added successfully.");
     }
 
     public function edit(Category $category): View
@@ -49,7 +51,8 @@ class CategoryController extends Controller
 
         $category->delete();
 
-        return redirect()->route('categories.index')->with('success', 'Category deleted.');
+        return redirect()->route('categories.index')
+            ->with('warning', "The category “{$category->name}” was deleted.");
     }
 
     private function validated(Request $request, ?Category $category = null): array
