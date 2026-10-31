@@ -108,18 +108,20 @@
                 @else
                     <div class="breadcrumb">Workspace <span>/</span> @yield('title', 'Dashboard')</div>
                 @endif
-                <div class="topbar-user">
-                    <span class="user-avatar">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span>
-                    <span class="user-name">{{ auth()->user()->name }}</span>
-                    <form method="POST" action="{{ route('logout') }}">@csrf<button class="link-button" type="submit">Sign out</button></form>
+                <div class="account-actions" aria-label="Account actions">
+                    <button class="account-profile-button" type="button" data-profile-open aria-label="View and edit profile">
+                        <span class="user-avatar">
+                            @if($navUser->avatar_url)<img src="{{ $navUser->avatar_url }}" alt="" onerror="this.remove()">@endif<span class="user-avatar-initial">{{ strtoupper(substr($navUser->name, 0, 1)) }}</span>
+                        </span>
+                        <span class="account-profile-name">{{ $navUser->name }}</span>
+                    </button>
+                    <form method="POST" action="{{ route('logout') }}">@csrf
+                        <button class="account-signout-button" type="submit">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></svg>
+                            <span>Sign out</span>
+                        </button>
+                    </form>
                 </div>
-                <details class="mobile-profile">
-                    <summary aria-label="Account menu">
-                        <span class="user-avatar">{{ strtoupper(substr(auth()->user()->name, 0, 1)) }}</span>
-                        <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="3" r="1"/><circle cx="8" cy="8" r="1"/><circle cx="8" cy="13" r="1"/></svg>
-                    </summary>
-                    <form method="POST" action="{{ route('logout') }}">@csrf<button class="link-button" type="submit">Sign out</button></form>
-                </details>
             </header>
             <div class="page-wrap">
                 <div class="page-heading">
@@ -166,6 +168,7 @@
             @endif
         </nav>
     </div>
+    @include('components.profile-dialog', ['profileUser' => $navUser])
     @include('components.confirmation-dialog')
 </body>
 </html>

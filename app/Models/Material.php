@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -14,8 +15,10 @@ class Material extends Model
     protected $fillable = [
         'item_code',
         'name',
+        'type',
         'cas_number',
         'category_id',
+        'product_category_id',
         'stock_unit',
         'reorder_level',
         'cost_per_unit',
@@ -34,9 +37,40 @@ class Material extends Model
         ];
     }
 
+    public function isProduct(): bool
+    {
+        return ($this->type ?? 'material') === 'product' || $this->product_category_id !== null;
+    }
+
+    public function isMaterial(): bool
+    {
+        return ! $this->isProduct();
+    }
+
+    public function scopeRawMaterials(Builder $query): Builder
+    {
+        return $query->where(function ($q) {
+            $q->where('materials.type', 'material')
+              ->whereNull('materials.product_category_id');
+        });
+    }
+
+    public function scopeProductionProducts(Builder $query): Builder
+    {
+        return $query->where(function ($q) {
+            $q->where('materials.type', 'product')
+              ->orWhereNotNull('materials.product_category_id');
+        });
+    }
+
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
+    }
+
+    public function productCategory(): BelongsTo
+    {
+        return $this->belongsTo(ProductCategory::class, 'product_category_id');
     }
 
     public function preferredSupplier(): BelongsTo
@@ -62,5 +96,10 @@ class Material extends Model
     public function productionOrderItems(): HasMany
     {
         return $this->hasMany(ProductionOrderItem::class);
+    }
+
+    public function recipes(): HasMany
+    {
+        return $this->hasMany(ProductRecipe::class, 'product_id');
     }
 }

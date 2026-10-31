@@ -12,6 +12,15 @@ use App\Http\Controllers\StockController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Auth;
+
+// DEV ONLY: Auto-login route (bypasses authentication)
+Route::get('/dev-login', function () {
+    $user = \App\Models\User::first();
+    Auth::login($user);
+    request()->session()->regenerate();
+    return redirect()->route($user->landingRoute());
+})->name('dev-login');
 
 Route::get('/', fn () => redirect()->route(auth()->check() ? auth()->user()->landingRoute() : 'login'));
 
@@ -23,6 +32,7 @@ Route::middleware('guest')->group(function () {
 });
 
 Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth')->name('logout');
+Route::put('/profile', [UserController::class, 'updateProfile'])->middleware('auth')->name('profile.update');
 
 Route::middleware('auth')->group(function () {
     Route::get('/dashboard', DashboardController::class)->middleware('permission:dashboard.view')->name('dashboard');
@@ -75,6 +85,26 @@ Route::middleware('auth')->group(function () {
     Route::get('/production', [ProductionController::class, 'index'])->middleware('permission:production.view')->name('production.index');
     Route::get('/production/create', [ProductionController::class, 'create'])->middleware('permission:production.create')->name('production.create');
     Route::post('/production', [ProductionController::class, 'store'])->middleware('permission:production.create')->name('production.store');
+
+    // Product recipe management
+    Route::get('/product-recipes', [App\Http\Controllers\ProductRecipeController::class, 'index'])
+        ->middleware('permission:product_recipes.view')
+        ->name('product_recipes.index');
+    Route::get('/product-recipes/create', [App\Http\Controllers\ProductRecipeController::class, 'create'])
+        ->middleware('permission:product_recipes.create')
+        ->name('product_recipes.create');
+    Route::post('/product-recipes', [App\Http\Controllers\ProductRecipeController::class, 'store'])
+        ->middleware('permission:product_recipes.create')
+        ->name('product_recipes.store');
+    Route::get('/product-recipes/{id}/edit', [App\Http\Controllers\ProductRecipeController::class, 'edit'])
+        ->middleware('permission:product_recipes.edit')
+        ->name('product_recipes.edit');
+    Route::put('/product-recipes/{id}', [App\Http\Controllers\ProductRecipeController::class, 'update'])
+        ->middleware('permission:product_recipes.edit')
+        ->name('product_recipes.update');
+    Route::delete('/product-recipes/{id}', [App\Http\Controllers\ProductRecipeController::class, 'destroy'])
+        ->middleware('permission:product_recipes.delete')
+        ->name('product_recipes.destroy');
 
     Route::get('/settings', [SettingsController::class, 'edit'])->middleware('permission:settings.view')->name('settings.edit');
     Route::put('/settings', [SettingsController::class, 'update'])->middleware('permission:settings.update')->name('settings.update');

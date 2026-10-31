@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Category;
 use App\Models\Material;
 use App\Models\MaterialLot;
+use App\Models\ProductCategory;
 use App\Models\Supplier;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -20,24 +21,54 @@ class MaterialController extends Controller
     {
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
+            'type' => ['nullable', Rule::in(['material', 'product', 'all'])],
             'category_id' => ['nullable', 'integer'],
             'status' => ['nullable', Rule::in(['in_stock', 'low_stock', 'out_of_stock', 'inactive', 'expiring'])],
             'filter' => ['nullable', Rule::in(['low', 'expiry'])],
-            'sort' => ['nullable', Rule::in(['code', 'material', 'cas', 'category', 'on_hand', 'reorder', 'expiry', 'location', 'status'])],
+            'sort' => ['nullable', Rule::in(['code', 'material', 'cas', 'category', 'on_hand', 'reorder', 'expiry', 'location', 'status', 'type'])],
             'direction' => ['nullable', Rule::in(['asc', 'desc'])],
             'per_page' => ['nullable', Rule::in(['10', '25', '50', '100'])],
         ]);
 
-        $materials = $this->listingQuery($request)
+        $currentType = $filters['type'] ?? 'material';
+
+        $typeCounts = [
+            'material' => Material::where('is_active', true)
+                ->where(function ($q) {
+                    $q->where('materials.type', 'material')
+                      ->whereNull('materials.product_category_id');
+                })->count(),
+            'product' => Material::where('is_active', true)
+                ->where(function ($q) {
+                    $q->where('materials.type', 'product')
+                      ->orWhereNotNull('materials.product_category_id');
+                })->count(),
+            'all' => Material::where('is_active', true)->count(),
+        ];
+
+        $materials = $this->listingQuery($request, $currentType)
             ->orderByRaw($this->sortExpression($filters['sort'] ?? 'material').' '.($filters['direction'] ?? 'asc'))
             ->orderBy('materials.id')
             ->paginate((int) ($filters['per_page'] ?? 10))
             ->withQueryString();
 
+        $typeCondition = function ($q) use ($currentType) {
+            if ($currentType === 'material') {
+                $q->where('materials.type', 'material')
+                  ->whereNull('materials.product_category_id');
+            } elseif ($currentType === 'product') {
+                $q->where(function ($sq) {
+                    $sq->where('materials.type', 'product')
+                       ->orWhereNotNull('materials.product_category_id');
+                });
+            }
+        };
+
         $stockCounts = DB::query()->fromSub(
             DB::table('materials')
                 ->leftJoin('material_lots', 'material_lots.material_id', '=', 'materials.id')
                 ->whereNull('materials.deleted_at')
+                ->where($typeCondition)
                 ->groupBy('materials.id', 'materials.is_active', 'materials.reorder_level')
                 ->select([
                     'materials.id',
@@ -47,45 +78,59 @@ class MaterialController extends Controller
                 ->selectRaw('COALESCE(SUM(material_lots.quantity_on_hand), 0) as on_hand'),
             'material_stock',
         )->selectRaw('
-            SUM(CASE WHEN is_active = 1 AND on_hand > reorder_level THEN 1 ELSE 0 END) as in_stock,
-            SUM(CASE WHEN is_active = 1 AND on_hand > 0 AND on_hand <= reorder_level THEN 1 ELSE 0 END) as low_stock,
-            SUM(CASE WHEN is_active = 1 AND on_hand <= 0 THEN 1 ELSE 0 END) as out_of_stock
+            COALESCE(SUM(CASE WHEN is_active = 1 AND on_hand > reorder_level THEN 1 ELSE 0 END), 0) as in_stock,
+            COALESCE(SUM(CASE WHEN is_active = 1 AND on_hand > 0 AND on_hand <= reorder_level THEN 1 ELSE 0 END), 0) as low_stock,
+            COALESCE(SUM(CASE WHEN is_active = 1 AND on_hand <= 0 THEN 1 ELSE 0 END), 0) as out_of_stock
         ')->first();
 
         $stats = [
-            'total' => Material::where('is_active', true)->count(),
-            'in_stock' => (int) $stockCounts->in_stock,
-            'low_stock' => (int) $stockCounts->low_stock,
-            'out_of_stock' => (int) $stockCounts->out_of_stock,
+            'total' => $typeCounts[$currentType] ?? $typeCounts['material'],
+            'in_stock' => (int) ($stockCounts->in_stock ?? 0),
+            'low_stock' => (int) ($stockCounts->low_stock ?? 0),
+            'out_of_stock' => (int) ($stockCounts->out_of_stock ?? 0),
             'expiring' => Material::where('is_active', true)
+                ->where($typeCondition)
                 ->whereHas('lots', fn ($lots) => $lots
                     ->whereNotNull('expiry_date')
                     ->whereBetween('expiry_date', [today(), today()->addDays(90)])
                     ->where('quantity_on_hand', '>', 0))
                 ->count(),
         ];
-        $categories = Category::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
 
-        return view('materials.index', compact('materials', 'stats', 'categories'));
+        $rawCategories = Category::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $productCategories = ProductCategory::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']);
+        $categories = $currentType === 'product' ? $productCategories : $rawCategories;
+
+        return view('materials.index', compact('materials', 'stats', 'categories', 'currentType', 'typeCounts', 'rawCategories', 'productCategories'));
     }
 
-    public function create(): View
+    public function create(Request $request): View
     {
-        return view('materials.form', $this->formData(new Material(['is_active' => true])));
+        $type = $request->query('type', 'material');
+        if (! in_array($type, ['material', 'product'], true)) {
+            $type = 'material';
+        }
+
+        return view('materials.form', $this->formData(new Material([
+            'is_active' => true,
+            'type' => $type,
+        ])));
     }
 
     public function store(Request $request): RedirectResponse
     {
         $material = Material::create($this->validated($request));
 
+        $itemLabel = $material->type === 'product' ? 'product' : 'material';
+
         return redirect()->route('materials.show', $material)
-            ->with('success_title', 'Material Added')
-            ->with('success', "The material “{$material->name}” was added successfully.");
+            ->with('success_title', ucfirst($itemLabel).' Added')
+            ->with('success', "The {$itemLabel} “{$material->name}” was added successfully.");
     }
 
     public function show(Material $material): View
     {
-        $material->load(['category', 'preferredSupplier']);
+        $material->load(['category', 'productCategory', 'preferredSupplier', 'recipes.material']);
         $lots = $material->lots()->orderByRaw('expiry_date is null')->orderBy('expiry_date')->paginate(15);
 
         return view('materials.show', compact('material', 'lots'));
@@ -100,8 +145,10 @@ class MaterialController extends Controller
     {
         $material->update($this->validated($request, $material));
 
+        $itemLabel = $material->type === 'product' ? 'product' : 'material';
+
         return redirect()->route('materials.show', $material)
-            ->with('success_title', 'Material Updated')
+            ->with('success_title', ucfirst($itemLabel).' Updated')
             ->with('success', "The details for “{$material->name}” were updated successfully.");
     }
 
@@ -113,73 +160,102 @@ class MaterialController extends Controller
             || $material->purchaseOrderItems()->exists()
             || $material->productionOrderItems()->exists()
         ) {
-            return back()->withErrors(['material' => 'This material has inventory history and cannot be archived. Set it inactive instead.']);
+            return back()->withErrors(['material' => 'This item has inventory history and cannot be archived. Set it inactive instead.']);
         }
 
         $material->delete();
 
         return redirect()->route('materials.index')
-            ->with('warning', "The material “{$material->name}” was archived.");
-    }
-
-    public function export(Request $request): StreamedResponse
-    {
-        $request->validate([
-            'ids' => ['sometimes', 'array', 'max:100'],
-            'ids.*' => ['integer', 'distinct', 'exists:materials,id'],
-        ]);
-        $query = $this->listingQuery($request);
-        if ($request->has('ids')) {
-            $query->whereIn('materials.id', $request->input('ids'));
-        }
-        $query->orderBy('materials.item_code');
-
-        return response()->streamDownload(function () use ($query) {
-            $output = fopen('php://output', 'w');
-            fputcsv($output, ['item_code', 'name', 'cas_number', 'category', 'quantity_on_hand', 'stock_unit', 'reorder_level', 'next_expiry', 'storage_location', 'status']);
-            $query->chunk(200, function ($materials) use ($output) {
-                foreach ($materials as $material) {
-                    $onHand = (float) $material->lots_sum_quantity_on_hand;
-                    fputcsv($output, [
-                        $material->item_code,
-                        $material->name,
-                        $material->cas_number,
-                        $material->category?->name,
-                        number_format($onHand, 3, '.', ''),
-                        $material->stock_unit,
-                        $material->reorder_level,
-                        $material->next_expiry_date,
-                        $material->storage_location ?: $material->effective_storage_location,
-                        $this->materialStatus($material, $onHand),
-                    ]);
-                }
-            });
-            fclose($output);
-        }, 'materials.csv', ['Content-Type' => 'text/csv']);
+            ->with('success_title', 'Item Archived')
+            ->with('success', "“{$material->name}” was removed from the active catalogue.");
     }
 
     public function print(Request $request): View
     {
-        $request->validate([
-            'ids' => ['sometimes', 'array', 'max:100'],
-            'ids.*' => ['integer', 'distinct', 'exists:materials,id'],
-        ]);
-        $query = $this->listingQuery($request);
-        if ($request->has('ids')) {
-            $query->whereIn('materials.id', $request->input('ids'));
-        }
-
-        $materials = $query
-            ->orderBy('materials.item_code')
-            ->get();
+        $materials = $this->selectedQuery($request)->get();
 
         return view('materials.print', compact('materials'));
     }
 
-    private function listingQuery(Request $request): Builder
+    public function export(Request $request): StreamedResponse
+    {
+        $materials = $this->selectedQuery($request)->get();
+
+        return response()->streamDownload(function () use ($materials) {
+            $handle = fopen('php://output', 'w');
+            fputcsv($handle, [
+                'Code',
+                'Type',
+                'Name',
+                'CAS No.',
+                'Category',
+                'Stock Unit',
+                'On Hand',
+                'Reorder Level',
+                'Unit Cost',
+                'Location',
+                'Supplier',
+                'Status',
+            ]);
+
+            foreach ($materials as $material) {
+                $onHand = (float) ($material->lots_sum_quantity_on_hand ?? 0);
+                $categoryName = $material->isProduct()
+                    ? ($material->productCategory?->name ?? 'Uncategorized')
+                    : ($material->category?->name ?? 'Uncategorized');
+
+                fputcsv($handle, [
+                    $material->item_code,
+                    $material->isProduct() ? 'Product' : 'Raw Material',
+                    $material->name,
+                    $material->cas_number,
+                    $categoryName,
+                    $material->stock_unit,
+                    $onHand,
+                    $material->reorder_level,
+                    $material->cost_per_unit,
+                    $material->effective_storage_location ?? $material->storage_location,
+                    $material->preferredSupplier?->name,
+                    $this->materialStatus($material, $onHand),
+                ]);
+            }
+
+            fclose($handle);
+        }, 'materials.csv', ['Content-Type' => 'text/csv']);
+    }
+
+    private function selectedQuery(Request $request): Builder
+    {
+        $request->validate(['ids' => ['nullable', 'array'], 'ids.*' => ['integer']]);
+        $ids = $request->input('ids', []);
+
+        return Material::query()
+            ->with(['category', 'productCategory', 'preferredSupplier'])
+            ->withSum('lots', 'quantity_on_hand')
+            ->addSelect([
+                'next_expiry_date' => MaterialLot::query()
+                    ->select('expiry_date')
+                    ->whereColumn('material_lots.material_id', 'materials.id')
+                    ->whereNotNull('expiry_date')
+                    ->where('quantity_on_hand', '>', 0)
+                    ->orderBy('expiry_date')
+                    ->limit(1),
+                'effective_storage_location' => MaterialLot::query()
+                    ->select('storage_location')
+                    ->whereColumn('material_lots.material_id', 'materials.id')
+                    ->whereNotNull('storage_location')
+                    ->orderByRaw('expiry_date is null')
+                    ->orderBy('expiry_date')
+                    ->limit(1),
+            ])
+            ->when(! empty($ids), fn (Builder $query) => $query->whereIn('materials.id', $ids))
+            ->orderBy('materials.item_code');
+    }
+
+    private function listingQuery(Request $request, string $currentType = 'material'): Builder
     {
         $query = Material::query()
-            ->with(['category', 'preferredSupplier'])
+            ->with(['category', 'productCategory', 'preferredSupplier', 'recipes.material'])
             ->withSum('lots', 'quantity_on_hand')
             ->addSelect([
                 'next_expiry_date' => MaterialLot::query()
@@ -198,6 +274,19 @@ class MaterialController extends Controller
                     ->limit(1),
             ]);
 
+        // Filter by item type: material, product, or all
+        if ($currentType === 'material') {
+            $query->where(function ($q) {
+                $q->where('materials.type', 'material')
+                  ->whereNull('materials.product_category_id');
+            });
+        } elseif ($currentType === 'product') {
+            $query->where(function ($q) {
+                $q->where('materials.type', 'product')
+                  ->orWhereNotNull('materials.product_category_id');
+            });
+        }
+
         if ($request->filled('q')) {
             $term = '%'.$request->string('q').'%';
             $query->where(function (Builder $search) use ($term) {
@@ -206,12 +295,24 @@ class MaterialController extends Controller
                     ->orWhere('materials.cas_number', 'like', $term)
                     ->orWhere('materials.storage_location', 'like', $term)
                     ->orWhereHas('preferredSupplier', fn (Builder $supplier) => $supplier->where('name', 'like', $term))
+                    ->orWhereHas('productCategory', fn (Builder $cat) => $cat->where('name', 'like', $term))
+                    ->orWhereHas('category', fn (Builder $cat) => $cat->where('name', 'like', $term))
                     ->orWhereHas('lots', fn (Builder $lot) => $lot->where('storage_location', 'like', $term));
             });
         }
 
         if ($request->filled('category_id') && ctype_digit((string) $request->input('category_id'))) {
-            $query->where('materials.category_id', (int) $request->input('category_id'));
+            $catId = (int) $request->input('category_id');
+            if ($currentType === 'product') {
+                $query->where('materials.product_category_id', $catId);
+            } elseif ($currentType === 'material') {
+                $query->where('materials.category_id', $catId);
+            } else {
+                $query->where(function ($q) use ($catId) {
+                    $q->where('materials.category_id', $catId)
+                      ->orWhere('materials.product_category_id', $catId);
+                });
+            }
         }
 
         $quantity = '(select coalesce(sum(material_lots.quantity_on_hand), 0) from material_lots where material_lots.material_id = materials.id)';
@@ -241,9 +342,10 @@ class MaterialController extends Controller
     private function sortExpression(string $sort): string
     {
         return match ($sort) {
+            'type' => 'materials.type',
             'code' => 'materials.item_code',
             'cas' => 'materials.cas_number',
-            'category' => '(select categories.name from categories where categories.id = materials.category_id)',
+            'category' => '(select coalesce((select product_categories.name from product_categories where product_categories.id = materials.product_category_id), (select categories.name from categories where categories.id = materials.category_id)))',
             'on_hand' => '(select coalesce(sum(material_lots.quantity_on_hand), 0) from material_lots where material_lots.material_id = materials.id)',
             'reorder' => 'materials.reorder_level',
             'expiry' => '(select min(material_lots.expiry_date) from material_lots where material_lots.material_id = materials.id and material_lots.quantity_on_hand > 0)',
@@ -294,6 +396,7 @@ class MaterialController extends Controller
                 $data = validator($data, [
                     'item_code' => ['required', 'string', 'max:50', 'unique:materials,item_code'],
                     'name' => ['required', 'string', 'max:255'],
+                    'type' => ['nullable', Rule::in(['material', 'product'])],
                     'stock_unit' => ['required', 'string', 'max:20'],
                     'reorder_level' => ['required', 'numeric', 'min:0'],
                     'cost_per_unit' => ['nullable', 'numeric', 'min:0'],
@@ -309,6 +412,8 @@ class MaterialController extends Controller
                 }
                 unset($data['category']);
 
+                $data['type'] = $data['type'] ?? 'material';
+
                 Material::create($data);
                 $count++;
             }
@@ -317,7 +422,7 @@ class MaterialController extends Controller
 
         return redirect()->route('materials.index')
             ->with('success_title', 'Materials Imported')
-            ->with('success', "{$count} materials were imported successfully.");
+            ->with('success', "{$count} items were imported successfully.");
     }
 
     private function validated(Request $request, ?Material $material = null): array
@@ -325,8 +430,10 @@ class MaterialController extends Controller
         $data = $request->validate([
             'item_code' => ['required', 'string', 'max:50', Rule::unique('materials', 'item_code')->ignore($material?->id)],
             'name' => ['required', 'string', 'max:255'],
+            'type' => ['nullable', Rule::in(['material', 'product'])],
             'cas_number' => ['nullable', 'string', 'max:50'],
             'category_id' => ['nullable', 'exists:categories,id'],
+            'product_category_id' => ['nullable', 'exists:product_categories,id'],
             'stock_unit' => ['required', 'string', 'max:20'],
             'reorder_level' => ['required', 'numeric', 'min:0'],
             'cost_per_unit' => ['nullable', 'numeric', 'min:0'],
@@ -336,6 +443,9 @@ class MaterialController extends Controller
             'handling_notes' => ['nullable', 'string'],
             'is_active' => ['sometimes', 'boolean'],
         ]);
+
+        $type = $data['type'] ?? ($request->filled('product_category_id') ? 'product' : ($material?->type ?? 'material'));
+        $data['type'] = $type;
 
         return array_merge($data, [
             'hazard_classes' => collect(explode(',', (string) $request->input('hazard_classes')))
@@ -349,6 +459,7 @@ class MaterialController extends Controller
         return [
             'material' => $material,
             'categories' => Category::where('is_active', true)->orderBy('name')->get(),
+            'productCategories' => ProductCategory::where('is_active', true)->orderBy('name')->get(),
             'suppliers' => Supplier::where('is_active', true)->orderBy('name')->get(),
             'hazardClasses' => implode(', ', $material->hazard_classes ?? []),
         ];

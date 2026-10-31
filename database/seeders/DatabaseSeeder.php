@@ -21,5 +21,9 @@ class DatabaseSeeder extends Seeder
             'name' => 'Test User',
             'email' => 'test@example.com',
         ]);
+
+        // Seed product recipes
+        $this->call(ProductRecipeTableSeeder::class);
+
     }
 }

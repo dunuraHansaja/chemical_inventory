@@ -6,6 +6,8 @@ use App\Models\Role;
 use App\Models\User;
 use App\Support\PermissionCatalog;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class AccessControlTest extends TestCase
@@ -19,7 +21,9 @@ class AccessControlTest extends TestCase
         $this->get('/login')
             ->assertOk()
             ->assertSee('Sign in · INVENTROO')
-            ->assertSee('images/inventroo-logo.png')
+            ->assertSee('images/inventroo-icon.png')
+            ->assertSee('Welcome Back')
+            ->assertSee('name="remember"', false)
             ->assertDontSee('ChemStock');
     }
 
@@ -32,6 +36,9 @@ class AccessControlTest extends TestCase
         $this->get('/dashboard')->assertOk()
             ->assertSee('INVENTROO')
             ->assertSee('images/inventroo-logo.png')
+            ->assertSee('data-profile-open', false)
+            ->assertSee('Profile details')
+            ->assertSee('Sign out')
             ->assertDontSee('ChemStock');
 
         $this->get('/settings/access/roles')
@@ -148,5 +155,211 @@ class AccessControlTest extends TestCase
             'is_active' => true,
             'role_id' => $systemRole->id,
         ]);
+    }
+
+    public function test_user_can_update_own_profile_without_changing_role_or_account_status(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+        $roleId = $user->role_id;
+        $this->actingAs($user);
+
+        $this->from('/dashboard')->put('/profile', [
+            'name' => 'Updated Profile',
+            'email' => 'updated-profile@example.test',
+            'password' => 'updated-secure-password',
+            'password_confirmation' => 'updated-secure-password',
+            'avatar' => UploadedFile::fake()->image('avatar.png'),
+        ])->assertRedirect('/dashboard')
+            ->assertSessionHas('success', 'Your profile details were updated successfully.');
+
+        $user->refresh();
+        $this->assertSame('Updated Profile', $user->name);
+        $this->assertSame('updated-profile@example.test', $user->email);
+        $this->assertSame($roleId, $user->role_id);
+        $this->assertTrue($user->is_active);
+        $this->assertTrue(\Illuminate\Support\Facades\Hash::check('updated-secure-password', $user->password));
+        $this->assertNotNull($user->avatar_path);
+        Storage::disk('public')->assertExists($user->avatar_path);
+
+        $this->get('/dashboard')->assertOk()
+            ->assertSee(Storage::disk('public')->url($user->avatar_path));
+    }
+
+    public function test_profile_update_rejects_an_email_used_by_another_account(): void
+    {
+        $user = User::factory()->create();
+        $otherUser = User::factory()->create();
+        $this->actingAs($user);
+
+        $this->from('/dashboard')->put('/profile', [
+            'name' => 'Changed Name',
+            'email' => $otherUser->email,
+            'password' => '',
+            'password_confirmation' => '',
+        ])->assertRedirect('/dashboard')
+            ->assertSessionHasErrorsIn('profile', ['email']);
+
+        $this->get('/dashboard')
+            ->assertOk()
+            ->assertSee('data-profile-invalid', false)
+            ->assertSee('The email has already been taken.');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $user->id,
+            'name' => $user->name,
+            'email' => $user->email,
+        ]);
+    }
+
+    public function test_profile_update_rejects_non_image_avatar_uploads(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $this->from('/dashboard')->put('/profile', [
+            'name' => $user->name,
+            'email' => $user->email,
+            'password' => '',
+            'password_confirmation' => '',
+            'avatar' => UploadedFile::fake()->create('avatar.txt', 10, 'text/plain'),
+        ])->assertRedirect('/dashboard')
+            ->assertSessionHasErrorsIn('profile', ['avatar']);
+
+        $this->assertDatabaseHas('users', ['id' => $user->id, 'avatar_path' => null]);
+        $this->assertSame([], Storage::disk('public')->allFiles('avatars'));
+    }
+
+    public function test_profile_avatar_replaces_the_previous_uploaded_image(): void
+    {
+        Storage::fake('public');
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $this->from('/dashboard')->put('/profile', [
+            'name' => $user->name,
+            'email' => $user->email,
+            'password' => '',
+            'password_confirmation' => '',
+            'avatar' => UploadedFile::fake()->image('first-avatar.png'),
+        ])->assertRedirect('/dashboard');
+
+        $user->refresh();
+        $previousAvatar = $user->avatar_path;
+
+        $this->from('/dashboard')->put('/profile', [
+            'name' => $user->name,
+            'email' => $user->email,
+            'password' => '',
+            'password_confirmation' => '',
+            'avatar' => UploadedFile::fake()->image('second-avatar.jpg'),
+        ])->assertRedirect('/dashboard');
+
+        $user->refresh();
+        $this->assertNotSame($previousAvatar, $user->avatar_path);
+        Storage::disk('public')->assertMissing($previousAvatar);
+        Storage::disk('public')->assertExists($user->avatar_path);
+    }
+
+    public function test_administrator_can_create_user_account_with_avatar(): void
+    {
+        Storage::fake('public');
+        $admin = User::factory()->create();
+        $this->actingAs($admin);
+
+        $role = Role::query()->firstOrCreate(['name' => 'Operator'], ['permissions' => ['materials.view']]);
+
+        $this->get('/settings/access/users/create')->assertOk()
+            ->assertSee('Profile avatar')
+            ->assertSee('name="avatar"', false);
+
+        $this->post('/settings/access/users', [
+            'name' => 'Operator Jane',
+            'email' => 'operator-jane@example.test',
+            'password' => 'secure-operator-password',
+            'password_confirmation' => 'secure-operator-password',
+            'role_id' => $role->id,
+            'is_active' => '1',
+            'avatar' => UploadedFile::fake()->image('jane.png'),
+        ])->assertRedirect('/settings/access/users');
+
+        $user = User::query()->where('email', 'operator-jane@example.test')->firstOrFail();
+        $this->assertNotNull($user->avatar_path);
+        Storage::disk('public')->assertExists($user->avatar_path);
+
+        $this->get('/settings/access/users')->assertOk()
+            ->assertSee($user->avatar_url);
+    }
+
+    public function test_administrator_can_update_and_remove_user_avatar(): void
+    {
+        Storage::fake('public');
+        $admin = User::factory()->create();
+        $this->actingAs($admin);
+
+        $role = Role::query()->firstOrCreate(['name' => 'Staff'], ['permissions' => ['materials.view']]);
+
+        $avatarPath = UploadedFile::fake()->image('existing-avatar.png')->store('avatars', 'public');
+        $user = User::factory()->create([
+            'role_id' => $role->id,
+            'avatar_path' => $avatarPath,
+        ]);
+
+        $this->get("/settings/access/users/{$user->id}/edit")->assertOk()
+            ->assertSee('Change avatar')
+            ->assertSee('Remove current avatar')
+            ->assertSee($user->avatar_url);
+
+        // Update with new avatar
+        $this->put("/settings/access/users/{$user->id}", [
+            'name' => $user->name,
+            'email' => $user->email,
+            'role_id' => $role->id,
+            'is_active' => '1',
+            'avatar' => UploadedFile::fake()->image('replacement-avatar.jpg'),
+        ])->assertRedirect('/settings/access/users');
+
+        $user->refresh();
+        $this->assertNotSame($avatarPath, $user->avatar_path);
+        Storage::disk('public')->assertMissing($avatarPath);
+        Storage::disk('public')->assertExists($user->avatar_path);
+
+        $currentAvatar = $user->avatar_path;
+
+        // Remove avatar
+        $this->put("/settings/access/users/{$user->id}", [
+            'name' => $user->name,
+            'email' => $user->email,
+            'role_id' => $role->id,
+            'is_active' => '1',
+            'remove_avatar' => '1',
+        ])->assertRedirect('/settings/access/users');
+
+        $user->refresh();
+        $this->assertNull($user->avatar_path);
+        Storage::disk('public')->assertMissing($currentAvatar);
+    }
+
+    public function test_administrator_user_creation_validates_avatar_file(): void
+    {
+        Storage::fake('public');
+        $admin = User::factory()->create();
+        $this->actingAs($admin);
+
+        $role = Role::query()->firstOrCreate(['name' => 'Auditor'], ['permissions' => ['movements.view']]);
+
+        $this->from('/settings/access/users/create')->post('/settings/access/users', [
+            'name' => 'Invalid Avatar User',
+            'email' => 'invalid-avatar@example.test',
+            'password' => 'secure-password-123',
+            'password_confirmation' => 'secure-password-123',
+            'role_id' => $role->id,
+            'is_active' => '1',
+            'avatar' => UploadedFile::fake()->create('malicious.pdf', 100, 'application/pdf'),
+        ])->assertRedirect('/settings/access/users/create')
+            ->assertSessionHasErrors('avatar');
+
+        $this->assertDatabaseMissing('users', ['email' => 'invalid-avatar@example.test']);
     }
 }

@@ -9,7 +9,17 @@
             <tbody>
             @forelse($users as $user)
                 <tr>
-                    <td><strong class="table-primary">{{ $user->name }}</strong></td>
+                    <td>
+                        <div class="user-table-cell">
+                            <span class="user-avatar user-avatar-sm" aria-hidden="true">
+                                @if($user->avatar_url)
+                                    <img src="{{ $user->avatar_url }}" alt="" onerror="this.remove()">
+                                @endif
+                                <span class="user-avatar-initial">{{ strtoupper(substr($user->name, 0, 1)) }}</span>
+                            </span>
+                            <strong class="table-primary">{{ $user->name }}</strong>
+                        </div>
+                    </td>
                     <td>{{ $user->email }}</td>
                     <td>{{ $user->role?->name ?? 'No role assigned' }}</td>
                     <td><span class="badge {{ $user->is_active ? 'badge-success' : 'badge-neutral' }}">{{ $user->is_active ? 'Active' : 'Inactive' }}</span></td>

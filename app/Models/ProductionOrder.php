@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ProductionOrder extends Model
 {
-    protected $fillable = ['order_number', 'produced_at', 'status', 'notes', 'created_by'];
+    protected $fillable = ['order_number', 'produced_at', 'status', 'product_category_id', 'notes', 'created_by'];
 
     protected function casts(): array
     {
@@ -18,6 +18,11 @@ class ProductionOrder extends Model
     public function items(): HasMany
     {
         return $this->hasMany(ProductionOrderItem::class);
+    }
+
+    public function productCategory(): BelongsTo
+    {
+        return $this->belongsTo(ProductCategory::class, 'product_category_id');
     }
 
     public function createdBy(): BelongsTo

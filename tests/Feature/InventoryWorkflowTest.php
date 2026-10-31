@@ -106,6 +106,206 @@ class InventoryWorkflowTest extends TestCase
         }
     }
 
+    public function test_production_catalog_groups_outputs_and_filters_by_category_and_search(): void
+    {
+        $user = User::factory()->create();
+        $category = Category::create([
+            'name' => 'Finished products',
+            'is_active' => true,
+        ]);
+        $input = Material::create([
+            'item_code' => 'RAW-100',
+            'name' => 'Production ingredient',
+            'stock_unit' => 'kg',
+            'reorder_level' => 0,
+            'is_active' => true,
+        ]);
+        $product = Material::create([
+            'category_id' => $category->id,
+            'item_code' => 'FIN-100',
+            'name' => 'Finished product',
+            'stock_unit' => 'kg',
+            'reorder_level' => 0,
+            'is_active' => true,
+        ]);
+        MaterialLot::create([
+            'material_id' => $input->id,
+            'lot_number' => 'RAW-BATCH-100',
+            'quantity_received' => 3,
+            'quantity_on_hand' => 3,
+            'expiry_date' => today()->addMonth(),
+            'status' => 'active',
+        ]);
+
+        $this->actingAs($user)
+            ->get('/production/create')
+            ->assertOk()
+            ->assertSee('Finished products')
+            ->assertSee('Finished product (FIN-100)');
+
+        $this->post('/production', [
+            'category_id' => $category->id,
+            'product_id' => $product->id,
+            'quantity' => 2,
+            'batch_number' => 'PB-TEST-100',
+            'expiry_date' => today()->addYear()->toDateString(),
+            'ingredients' => [['material_id' => $input->id, 'quantity' => 1]],
+        ])->assertRedirect('/production');
+
+        $this->get('/production?category_id='.$category->id.'&q=FIN-100')
+            ->assertOk()
+            ->assertSee('Finished products')
+            ->assertSee('Finished product')
+            ->assertSee('PB-TEST-100')
+            ->assertSee('Expires '.today()->addYear()->toDateString());
+
+        $this->get('/production?category_id='.$category->id.'&q=missing')
+            ->assertOk()
+            ->assertSee('No matching production records')
+            ->assertDontSee('PB-TEST-100');
+    }
+
+    public function test_production_supports_product_category_selection_and_creation(): void
+    {
+        $user = User::factory()->create();
+        $productCategory = \App\Models\ProductCategory::create([
+            'name' => 'Hand Wash',
+            'is_active' => true,
+        ]);
+
+        $input = Material::create([
+            'item_code' => 'RAW-ING-1',
+            'name' => 'SLES Solution',
+            'stock_unit' => 'kg',
+            'reorder_level' => 0,
+            'is_active' => true,
+        ]);
+        $product = Material::create([
+            'item_code' => 'FIN-HW-1',
+            'name' => 'Lavender Hand Wash 500ml',
+            'stock_unit' => 'kg',
+            'reorder_level' => 0,
+            'is_active' => true,
+        ]);
+        MaterialLot::create([
+            'material_id' => $input->id,
+            'lot_number' => 'RAW-LOT-HW-1',
+            'quantity_received' => 10,
+            'quantity_on_hand' => 10,
+            'expiry_date' => today()->addMonths(6),
+            'status' => 'active',
+        ]);
+
+        // Form shows "Product Category" and existing category "Hand Wash"
+        $this->actingAs($user)
+            ->get('/production/create')
+            ->assertOk()
+            ->assertSee('Product Category')
+            ->assertSee('Hand Wash');
+
+        // Create production typing a new Product Category "Automobile cleanings"
+        $this->post('/production', [
+            'new_product_category' => 'Automobile cleanings',
+            'product_id' => $product->id,
+            'quantity' => 5,
+            'batch_number' => 'PB-AUTO-001',
+            'expiry_date' => today()->addYear()->toDateString(),
+            'ingredients' => [['material_id' => $input->id, 'quantity' => 2]],
+        ])->assertRedirect('/production');
+
+        $this->assertDatabaseHas('product_categories', [
+            'name' => 'Automobile cleanings',
+        ]);
+
+        $createdCategory = \App\Models\ProductCategory::where('name', 'Automobile cleanings')->first();
+        $this->assertNotNull($createdCategory);
+        $this->assertEquals($createdCategory->id, $product->fresh()->product_category_id);
+
+        // Production index lists production under the new Product Category
+        $this->get('/production?category_id='.$createdCategory->id)
+            ->assertOk()
+            ->assertSee('Automobile cleanings')
+            ->assertSee('Lavender Hand Wash 500ml')
+            ->assertSee('PB-AUTO-001');
+    }
+
+    public function test_production_card_click_and_edit_updates_details(): void
+    {
+        $user = User::factory()->create();
+        $category = \App\Models\ProductCategory::create([
+            'name' => 'Auto Care',
+            'is_active' => true,
+        ]);
+        $ingredient = Material::create([
+            'item_code' => 'ING-WAX',
+            'name' => 'Carnauba Wax',
+            'stock_unit' => 'kg',
+            'reorder_level' => 0,
+            'is_active' => true,
+        ]);
+        $product = Material::create([
+            'item_code' => 'PRD-WAX-1',
+            'name' => 'Premium Car Wax',
+            'product_category_id' => $category->id,
+            'stock_unit' => 'L',
+            'reorder_level' => 0,
+            'is_active' => true,
+        ]);
+        MaterialLot::create([
+            'material_id' => $product->id,
+            'lot_number' => 'PB-2026-0099',
+            'quantity_received' => 50,
+            'quantity_on_hand' => 50,
+            'expiry_date' => today()->addYear(),
+            'status' => 'active',
+        ]);
+        \App\Models\ProductRecipe::create([
+            'product_id' => $product->id,
+            'material_id' => $ingredient->id,
+            'quantity' => 12,
+        ]);
+
+        // Card renders with editable attributes and ingredients
+        $this->actingAs($user)
+            ->get('/production')
+            ->assertOk()
+            ->assertSee('data-product-id="'.$product->id.'"', false)
+            ->assertSee('Premium Car Wax')
+            ->assertSee('PB-2026-0099')
+            ->assertSee('ING-WAX', false);
+
+        // Submit edit request
+        $this->post('/production', [
+            'editing_product_id' => $product->id,
+            'category_id' => $category->id,
+            'product_id' => $product->id,
+            'new_production_name' => 'Ultra Car Wax Deluxe',
+            'quantity' => 65,
+            'batch_number' => 'PB-2026-0100',
+            'expiry_date' => today()->addYears(2)->toDateString(),
+            'ingredients' => [
+                ['material_id' => $ingredient->id, 'quantity' => 15, 'unit' => 'kg'],
+            ],
+        ])->assertRedirect('/production');
+
+        // Material name updated
+        $this->assertEquals('Ultra Car Wax Deluxe', $product->fresh()->name);
+
+        // Recipe updated
+        $this->assertDatabaseHas('product_recipes', [
+            'product_id' => $product->id,
+            'material_id' => $ingredient->id,
+            'quantity' => 15,
+        ]);
+
+        // Lot updated
+        $this->assertDatabaseHas('material_lots', [
+            'material_id' => $product->id,
+            'lot_number' => 'PB-2026-0100',
+            'quantity_on_hand' => 65,
+        ]);
+    }
+
     public function test_currency_and_vat_settings_persist_and_are_used_as_purchase_defaults(): void
     {
         $this->actingAs(User::factory()->create());
