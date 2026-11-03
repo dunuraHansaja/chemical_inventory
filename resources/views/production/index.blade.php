@@ -1,4 +1,5 @@
 @extends('layouts.app')
+@section('eyebrow', 'PRODUCTS & FORMULATION')
 @section('title', 'Products')
 @section('subtitle', 'Manage manufactured products and pre-defined formulation recipes.')
 @section('actions')

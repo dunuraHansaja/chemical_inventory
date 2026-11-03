@@ -178,10 +178,11 @@ class MaterialController extends Controller
             return $material;
         });
 
-        $itemLabel = $material->type === 'product' ? 'product' : 'material';
+        $targetType = $material->type === 'product' ? 'product' : 'material';
+        $itemLabel = $material->type === 'product' ? 'packaging / can' : 'material';
 
-        return redirect()->route('materials.show', $material)
-            ->with('success_title', ucfirst($itemLabel).' Added')
+        return redirect()->route('materials.index', ['type' => $targetType])
+            ->with('success_title', ($material->type === 'product' ? 'Packaging / Can' : 'Material').' Added')
             ->with('success', "The {$itemLabel} “{$material->name}” was added successfully.");
     }
 
@@ -255,10 +256,11 @@ class MaterialController extends Controller
             }
         });
 
-        $itemLabel = $material->type === 'product' ? 'product' : 'material';
+        $targetType = $material->type === 'product' ? 'product' : 'material';
+        $itemLabel = $material->type === 'product' ? 'packaging / can' : 'material';
 
-        return redirect()->route('materials.show', $material)
-            ->with('success_title', ucfirst($itemLabel).' Updated')
+        return redirect()->route('materials.index', ['type' => $targetType])
+            ->with('success_title', ($material->type === 'product' ? 'Packaging / Can' : 'Material').' Updated')
             ->with('success', "The details for “{$material->name}” were updated successfully.");
     }
 

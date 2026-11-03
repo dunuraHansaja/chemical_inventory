@@ -928,4 +928,41 @@ class InventoryWorkflowTest extends TestCase
         $this->assertDatabaseCount('stock_movements', 0);
         $this->assertDatabaseCount('material_lots', 0);
     }
+
+    public function test_dashboard_renders_safely_when_material_is_soft_deleted(): void
+    {
+        $user = User::factory()->create();
+        $material = Material::create([
+            'item_code' => 'DEL-001',
+            'name' => 'To be deleted',
+            'stock_unit' => 'kg',
+            'reorder_level' => 10,
+            'is_active' => true,
+        ]);
+
+        $lot = MaterialLot::create([
+            'material_id' => $material->id,
+            'lot_number' => 'LOT-DEL-01',
+            'quantity_received' => 50,
+            'quantity_on_hand' => 50,
+            'unit_cost' => 12.00,
+            'expiry_date' => now()->addDays(10)->toDateString(),
+            'status' => 'active',
+        ]);
+
+        StockMovement::create([
+            'material_id' => $material->id,
+            'material_lot_id' => $lot->id,
+            'movement_type' => 'opening_stock',
+            'quantity' => 50,
+            'balance_after' => 50,
+            'created_by' => $user->id,
+        ]);
+
+        $material->delete();
+
+        $this->actingAs($user)->get('/dashboard')->assertOk()->assertSee('To be deleted');
+        $this->get(route('movements.index'))->assertOk()->assertSee('To be deleted');
+        $this->get(route('lots.index'))->assertOk()->assertSee('To be deleted');
+    }
 }
