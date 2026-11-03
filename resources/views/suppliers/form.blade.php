@@ -49,7 +49,10 @@
             <div class="span-2">
                 <label class="checkbox-label" for="supplier-is-active">
                     <input type="checkbox" id="supplier-is-active" name="is_active" value="1" @checked(old('is_active', $supplier->is_active ?? true))>
-                    <span>Active supplier</span>
+                    <span class="checkbox-card-copy">
+                        <strong>Active supplier</strong>
+                        <small>Allow this supplier to be selected on material catalogue records and purchase orders.</small>
+                    </span>
                 </label>
             </div>
         </div>

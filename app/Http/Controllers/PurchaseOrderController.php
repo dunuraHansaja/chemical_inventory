@@ -19,7 +19,7 @@ class PurchaseOrderController extends Controller
 {
     public function index(): View
     {
-        $orders = PurchaseOrder::with(['supplier', 'items'])->latest()->paginate(20);
+        $orders = PurchaseOrder::with(['supplier', 'items.material'])->latest()->paginate(20);
 
         return view('purchases.index', compact('orders'));
     }

@@ -37,15 +37,20 @@ class ProductionController extends Controller
 
         $productionGroups = collect();
         foreach ($categoriesList as $cat) {
-            $materialsQuery = Material::query()
+            $materialsQuery = Material::query()->whereNull('packaging_type')
                 ->where('is_active', true)
+                ->where(function ($q) {
+                    $q->where('type', '!=', 'material')
+                      ->orWhereNotNull('product_category_id');
+                })
                 ->when($useProductCategories, function ($q) use ($cat) {
-                    $q->where(function ($catQ) use ($cat) {
-                        $catQ->where('product_category_id', $cat->id)
-                             ->orWhere(fn ($sq) => $sq->whereNull('product_category_id')->where('category_id', $cat->id));
-                    });
+                    $q->where('product_category_id', $cat->id);
                 }, function ($q) use ($cat) {
-                    $q->where('category_id', $cat->id);
+                    $q->where('category_id', $cat->id)
+                      ->where(function ($sub) {
+                          $sub->whereIn('type', ['product', 'finished_good', 'semi_finished_good'])
+                              ->orWhereHas('recipes');
+                      });
                 })
                 ->when($search !== '', function ($q) use ($search) {
                     $q->where(function ($sq) use ($search) {
@@ -101,7 +106,8 @@ class ProductionController extends Controller
             ->get();
 
         $createOpen = $request->routeIs('production.create') 
-            || ($request->has('create') ? $request->boolean('create') : true);
+            || $request->boolean('create')
+            || $request->session()->has('errors');
 
         return view('production.index', [
             'categories' => $formCategories,
@@ -136,6 +142,7 @@ class ProductionController extends Controller
                 'new_product_category' => ['nullable', 'string', 'max:100'],
                 'product_id' => ['nullable'],
                 'new_production_name' => ['nullable', 'string', 'max:255'],
+                'goods_type' => ['nullable', 'string', 'in:finished_good,semi_finished_good'],
                 'product_unit' => ['nullable', 'string', 'max:20'],
                 'quantity' => ['required', 'numeric', 'gt:0'],
                 'batch_number' => ['nullable', 'string', 'max:50'],
@@ -164,10 +171,14 @@ class ProductionController extends Controller
                     $productCategory = ProductCategory::find($data['category_id'])
                         ?? Category::find($data['category_id']);
                 }
+                $prodType = ($data['goods_type'] ?? '') === 'semi_finished_good'
+                    ? 'semi_finished_good'
+                    : ($request->has('goods_type') ? 'product' : ($productMaterial->type === 'semi_finished_good' ? 'semi_finished_good' : 'product'));
+
                 if ($productCategory) {
-                    $productMaterial->update(['product_category_id' => $productCategory->id, 'type' => 'product']);
+                    $productMaterial->update(['product_category_id' => $productCategory->id, 'type' => $prodType]);
                 } else {
-                    $productMaterial->update(['type' => 'product']);
+                    $productMaterial->update(['type' => $prodType]);
                 }
 
                 // If renamed
@@ -221,11 +232,11 @@ class ProductionController extends Controller
                         $movement->update([
                             'quantity' => $data['quantity'],
                             'balance_after' => $data['quantity'],
-                            'notes' => $data['notes'] ?: $movement->notes,
+                            'notes' => ! empty($data['notes']) ? $data['notes'] : $movement->notes,
                         ]);
                     }
                 } else {
-                    $batchNo = $batchNumber ?: ("PB-" . date('Y') . "-0001");
+                    $batchNo = $batchNumber ?: ("PB-" . date('Y') . "-" . str_pad($productMaterial->id, 4, '0', STR_PAD_LEFT));
                     $lot = MaterialLot::create([
                         'material_id' => $productMaterial->id,
                         'lot_number' => $batchNo,
@@ -235,7 +246,7 @@ class ProductionController extends Controller
                         'manufactured_date' => today()->toDateString(),
                         'unit_cost' => $productMaterial->cost_per_unit,
                         'status' => 'active',
-                        'notes' => $data['notes'] ?: ('Production batch ' . $batchNo),
+                        'notes' => ! empty($data['notes']) ? $data['notes'] : ('Production batch ' . $batchNo),
                     ]);
                     StockMovement::create([
                         'material_id' => $productMaterial->id,
@@ -329,7 +340,7 @@ class ProductionController extends Controller
                 $productMaterial = Material::create([
                     'name' => $prodName,
                     'item_code' => $candidateCode,
-                    'type' => 'product',
+                    'type' => ($data['goods_type'] ?? '') === 'semi_finished_good' ? 'semi_finished_good' : 'product',
                     'product_category_id' => $productCategory?->id,
                     'stock_unit' => $stockUnit,
                     'reorder_level' => 0,
@@ -337,10 +348,13 @@ class ProductionController extends Controller
                 ]);
             } elseif ($hasProductId) {
                 $productMaterial = Material::findOrFail($data['product_id']);
+                $prodType = ($data['goods_type'] ?? '') === 'semi_finished_good'
+                    ? 'semi_finished_good'
+                    : ($request->has('goods_type') ? 'product' : ($productMaterial->type === 'semi_finished_good' ? 'semi_finished_good' : 'product'));
                 if ($productCategory && $productMaterial->product_category_id !== $productCategory->id) {
-                    $productMaterial->update(['product_category_id' => $productCategory->id, 'type' => 'product']);
+                    $productMaterial->update(['product_category_id' => $productCategory->id, 'type' => $prodType]);
                 } else {
-                    $productMaterial->update(['type' => 'product']);
+                    $productMaterial->update(['type' => $prodType]);
                 }
             }
 
@@ -368,16 +382,47 @@ class ProductionController extends Controller
                 }
             }
 
-            $outputs = [
-                [
-                    'material_id' => $productMaterial->id,
-                    'quantity' => $data['quantity'],
-                    'lot_number' => $batchNumber,
-                    'expiry_date' => $data['expiry_date'] ?? null,
-                ]
-            ];
-            $notes = $data['notes'] ?? null;
-            $productCategoryId = $productCategory?->id;
+            // Save recipe (for 1 unit)
+            ProductRecipe::where('product_id', $productMaterial->id)->delete();
+            foreach ($inputs as $input) {
+                ProductRecipe::create([
+                    'product_id' => $productMaterial->id,
+                    'material_id' => $input['material_id'],
+                    'quantity' => $input['quantity'],
+                ]);
+            }
+
+            $qty = ! empty($data['quantity']) ? (float) $data['quantity'] : 1;
+            $lot = MaterialLot::firstOrCreate([
+                'material_id' => $productMaterial->id,
+                'lot_number' => $batchNumber,
+            ], [
+                'quantity_received' => $qty,
+                'quantity_on_hand' => $qty,
+                'expiry_date' => $data['expiry_date'] ?? null,
+                'manufactured_date' => $producedAt,
+                'unit_cost' => $productMaterial->cost_per_unit,
+                'status' => 'active',
+                'notes' => $data['notes'] ?? ('Recipe for ' . $productMaterial->name),
+            ]);
+
+            StockMovement::firstOrCreate([
+                'material_id' => $productMaterial->id,
+                'material_lot_id' => $lot->id,
+                'movement_type' => 'production_output',
+            ], [
+                'quantity' => $qty,
+                'balance_after' => $qty,
+                'reference_type' => 'production',
+                'reference_id' => $lot->id,
+                'notes' => 'Recipe for ' . $productMaterial->name,
+                'created_by' => $request->user()->id,
+            ]);
+
+            return redirect()->route('production.index')
+                ->with('selected_category', $productCategory?->id)
+                ->with('success_title', 'Recipe Saved')
+                ->with('success', "Formulation recipe for {$productMaterial->name} has been saved.");
         } else {
             $data = $request->validate([
                 'produced_at' => ['required', 'date'],
@@ -515,5 +560,28 @@ class ProductionController extends Controller
             ->with('selected_category', $productCategoryId)
             ->with('success_title', 'Production Completed')
             ->with('success', "Production {$order->order_number} was completed and stock updated.");
+    }
+
+    public function destroy(Material $material): RedirectResponse
+    {
+        $name = $material->name;
+        $categoryId = $material->product_category_id;
+
+        ProductRecipe::where('product_id', $material->id)->delete();
+        $material->delete();
+
+        $previousUrl = url()->previous();
+        if (str_contains($previousUrl, '/finished-goods') || str_contains($previousUrl, '/semi-finished-goods')) {
+            return back()
+                ->with('success_title', 'Product Deleted')
+                ->with('success', "{$name} and its formulation recipe have been deleted.");
+        }
+        if (false)
+        $material->delete();
+
+        return redirect()->route('production.index')
+            ->with('selected_category', $categoryId)
+            ->with('success_title', 'Product Deleted')
+            ->with('success', "{$name} and its formulation recipe have been deleted.");
     }
 }

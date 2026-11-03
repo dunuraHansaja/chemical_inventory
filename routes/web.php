@@ -3,12 +3,15 @@
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\FinishedGoodsController;
 use App\Http\Controllers\MaterialController;
 use App\Http\Controllers\ProductionController;
 use App\Http\Controllers\PurchaseOrderController;
 use App\Http\Controllers\RoleController;
+use App\Http\Controllers\SemiFinishedGoodsController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\StockController;
+use App\Http\Controllers\StorageLocationController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
@@ -49,6 +52,11 @@ Route::middleware('auth')->group(function () {
     Route::patch('/materials/{material}', [MaterialController::class, 'update'])->middleware('permission:materials.edit')->name('materials.update.patch');
     Route::delete('/materials/{material}', [MaterialController::class, 'destroy'])->middleware('permission:materials.delete')->name('materials.destroy');
 
+    Route::get('/finished-goods', [FinishedGoodsController::class, 'index'])->middleware('permission:finished_goods.view')->name('finished-goods.index');
+    Route::post('/finished-goods/produce', [FinishedGoodsController::class, 'recordProduction'])->middleware('permission:finished_goods.view')->name('finished-goods.produce');
+    Route::get('/semi-finished-goods', [SemiFinishedGoodsController::class, 'index'])->middleware('permission:semi_finished_goods.view')->name('semi-finished-goods.index');
+    Route::post('/semi-finished-goods/produce', [SemiFinishedGoodsController::class, 'recordProduction'])->middleware('permission:semi_finished_goods.view')->name('semi-finished-goods.produce');
+
     Route::get('/suppliers', [SupplierController::class, 'index'])->middleware('permission:suppliers.view')->name('suppliers.index');
     Route::get('/suppliers/create', [SupplierController::class, 'create'])->middleware('permission:suppliers.create')->name('suppliers.create');
     Route::post('/suppliers', [SupplierController::class, 'store'])->middleware('permission:suppliers.create')->name('suppliers.store');
@@ -65,9 +73,18 @@ Route::middleware('auth')->group(function () {
     Route::patch('/categories/{category}', [CategoryController::class, 'update'])->middleware('permission:categories.edit')->name('categories.update.patch');
     Route::delete('/categories/{category}', [CategoryController::class, 'destroy'])->middleware('permission:categories.delete')->name('categories.destroy');
 
+    Route::get('/storage-locations', [StorageLocationController::class, 'index'])->middleware('permission:storage_locations.view')->name('storage-locations.index');
+    Route::get('/storage-locations/create', [StorageLocationController::class, 'create'])->middleware('permission:storage_locations.create')->name('storage-locations.create');
+    Route::post('/storage-locations', [StorageLocationController::class, 'store'])->middleware('permission:storage_locations.create')->name('storage-locations.store');
+    Route::get('/storage-locations/{storageLocation}/edit', [StorageLocationController::class, 'edit'])->middleware('permission:storage_locations.edit')->name('storage-locations.edit');
+    Route::put('/storage-locations/{storageLocation}', [StorageLocationController::class, 'update'])->middleware('permission:storage_locations.edit')->name('storage-locations.update');
+    Route::patch('/storage-locations/{storageLocation}', [StorageLocationController::class, 'update'])->middleware('permission:storage_locations.edit')->name('storage-locations.update.patch');
+    Route::delete('/storage-locations/{storageLocation}', [StorageLocationController::class, 'destroy'])->middleware('permission:storage_locations.delete')->name('storage-locations.destroy');
+
     Route::get('/lots', [StockController::class, 'lots'])->middleware('permission:lots.view')->name('lots.index');
     Route::get('/lots/create', [StockController::class, 'createLot'])->middleware('permission:lots.create')->name('lots.create');
     Route::post('/lots', [StockController::class, 'storeLot'])->middleware('permission:lots.create')->name('lots.store');
+    Route::delete('/lots/{lot}', [StockController::class, 'destroyLot'])->middleware('permission:lots.create')->name('lots.destroy');
     Route::get('/stock/adjustments/create', [StockController::class, 'adjustments'])->middleware('permission:adjustments.create')->name('adjustments.create');
     Route::post('/stock/adjustments', [StockController::class, 'adjust'])->middleware('permission:adjustments.create')->name('adjustments.store');
     Route::get('/stock/movements', [StockController::class, 'movements'])->middleware('permission:movements.view')->name('movements.index');
@@ -85,6 +102,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/production', [ProductionController::class, 'index'])->middleware('permission:production.view')->name('production.index');
     Route::get('/production/create', [ProductionController::class, 'create'])->middleware('permission:production.create')->name('production.create');
     Route::post('/production', [ProductionController::class, 'store'])->middleware('permission:production.create')->name('production.store');
+    Route::delete('/production/{material}', [ProductionController::class, 'destroy'])->middleware('permission:production.create')->name('production.destroy');
 
     // Product recipe management
     Route::get('/product-recipes', [App\Http\Controllers\ProductRecipeController::class, 'index'])
@@ -124,5 +142,6 @@ Route::middleware('auth')->group(function () {
         Route::post('/', 'store')->name('store');
         Route::get('/{user}/edit', 'edit')->name('edit');
         Route::put('/{user}', 'update')->name('update');
+        Route::delete('/{user}', 'destroy')->name('destroy');
     });
 });

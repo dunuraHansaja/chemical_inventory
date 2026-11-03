@@ -12,8 +12,8 @@
 @section('content')
     @php($onHand = (float) $material->lots()->sum('quantity_on_hand'))
     <div class="detail-stats">
-        <div class="detail-stat"><span>ON HAND</span><strong>{{ number_format($onHand, 3) }} <small>{{ $material->stock_unit }}</small></strong><p>Across {{ $material->lots()->count() }} lots</p></div>
-        <div class="detail-stat"><span>REORDER LEVEL</span><strong>{{ number_format((float) $material->reorder_level, 3) }} <small>{{ $material->stock_unit }}</small></strong><p>{{ $onHand <= (float)$material->reorder_level ? 'Reorder recommended' : 'Stock above threshold' }}</p></div>
+        <div class="detail-stat"><span>ON HAND</span><strong>{{ number_format($onHand, 2) }} <small>{{ $material->stock_unit }}</small></strong><p>Across {{ $material->lots()->count() }} lots</p></div>
+        <div class="detail-stat"><span>{{ $material->isProduct() ? 'REORDER REMAINING QTY' : 'REORDER LEVEL' }}</span><strong>{{ number_format((float) $material->reorder_level, 2) }} <small>{{ $material->stock_unit }}</small></strong><p>{{ $onHand <= (float)$material->reorder_level ? 'Reorder recommended' : 'Stock above threshold' }}</p></div>
         <div class="detail-stat"><span>STATUS</span><strong><span class="badge {{ $material->is_active ? 'badge-success' : 'badge-neutral' }}">{{ $material->is_active ? 'Active' : 'Inactive' }}</span></strong><p>Updated {{ $material->updated_at->diffForHumans() }}</p></div>
     </div>
     <div class="detail-grid">
@@ -29,7 +29,7 @@
                     <dt>Classification</dt>
                     <dd>
                         <span class="type-indicator-badge {{ $material->isProduct() ? 'product-type' : 'material-type' }}">
-                            {{ $material->isProduct() ? '📦 Production Product' : '🧪 Raw Material' }}
+                            {{ $material->isProduct() ? '📦 Packagings and Cans' : '🧪 Raw Material' }}
                         </span>
                     </dd>
                 </div>
@@ -50,7 +50,7 @@
                         <dd>
                             <ul style="margin: 0; padding-left: 18px; line-height: 1.6;">
                                 @foreach($material->recipes as $recipe)
-                                    <li><strong>{{ $recipe->material?->name ?? 'Unknown' }}</strong> ({{ number_format((float)$recipe->quantity, 3) }} {{ $recipe->material?->stock_unit ?? '' }})</li>
+                                    <li><strong>{{ $recipe->material?->name ?? 'Unknown' }}</strong> ({{ number_format((float)$recipe->quantity, 2) }} {{ $recipe->material?->stock_unit ?? '' }})</li>
                                 @endforeach
                             </ul>
                         </dd>
@@ -58,7 +58,24 @@
                 @endif
                 <div><dt>Storage location</dt><dd>{{ $material->storage_location ?: '—' }}</dd></div>
                 <div><dt>Cost per unit</dt><dd>{{ $material->cost_per_unit === null ? '—' : $inventorySettings['currency_symbol'].number_format((float)$material->cost_per_unit, 2) }}</dd></div>
-                <div><dt>Hazard classes</dt><dd>{{ implode(', ', $material->hazard_classes ?? []) ?: '—' }}</dd></div>
+                <div>
+                    <dt>Hazard classes</dt>
+                    <dd>
+                        @if(!empty($material->hazard_classes))
+                            <span class="sr-only">{{ implode(', ', $material->hazard_classes) }}</span>
+                            <div class="hazard-pills-list">
+                                @foreach($material->hazard_classes as $hazardName)
+                                    <span class="hazard-pill-badge">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                        <span>{{ $hazardName }}</span>
+                                    </span>
+                                @endforeach
+                            </div>
+                        @else
+                            —
+                        @endif
+                    </dd>
+                </div>
                 <div><dt>Handling notes</dt><dd>{{ $material->handling_notes ?: '—' }}</dd></div>
             </dl>
         </section>
@@ -103,7 +120,7 @@
                             <td><strong>{{ $lot->lot_number }}</strong><small class="table-secondary">{{ $lot->supplier_lot_number ? 'Supplier lot '.$lot->supplier_lot_number : '' }}</small></td>
                             <td>{{ $lot->manufactured_date?->format('d M Y') ?? '—' }}</td>
                             <td>{{ $lot->expiry_date?->format('d M Y') ?? 'No expiry' }}</td>
-                            <td>{{ number_format((float)$lot->quantity_on_hand, 3) }} {{ $material->stock_unit }}</td>
+                            <td>{{ number_format((float)$lot->quantity_on_hand, 2) }} {{ $material->stock_unit }}</td>
                             <td>{{ $lot->unit_cost === null ? '—' : $inventorySettings['currency_symbol'].number_format((float)$lot->unit_cost, 2) }}</td>
                             <td><span class="badge {{ (float)$lot->quantity_on_hand > 0 ? 'badge-success' : 'badge-neutral' }}">{{ (float)$lot->quantity_on_hand > 0 ? 'Available' : 'Depleted' }}</span></td>
                         </tr>

@@ -31,7 +31,7 @@
             </label>
 
             <label>Quantity received <span class="required">*</span>
-                <input type="number" name="quantity_received" min="0.001" step="0.001" value="{{ old('quantity_received') }}" placeholder="0.000" required>
+                <input type="number" name="quantity_received" min="0.01" step="0.01" value="{{ old('quantity_received') }}" placeholder="0.00" required>
             </label>
 
             <label>Unit cost
@@ -51,7 +51,14 @@
             </label>
 
             <label>Storage location
-                <input name="storage_location" value="{{ old('storage_location') }}" placeholder="e.g. Warehouse A / Shelf 3-B">
+                <select name="storage_location">
+                    <option value="">No storage location</option>
+                    @foreach($storageLocations as $location)
+                        <option value="{{ $location->name }}" @selected(old('storage_location') == $location->name)>
+                            {{ $location->name }}@if($location->address) — {{ $location->address }}@endif
+                        </option>
+                    @endforeach
+                </select>
             </label>
 
             <label class="span-2">Notes

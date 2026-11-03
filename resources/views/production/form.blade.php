@@ -79,7 +79,7 @@
                     Units <span class="production-unit-pill" data-quantity-unit-tag hidden></span> <span class="required">*</span>
                 </label>
                 <div class="production-input-wrap">
-                    <input id="quantity-made-input" type="number" name="quantity" min="0.001" step="0.001" value="{{ old('quantity') }}" placeholder="e.g. 20" required>
+                    <input id="quantity-made-input" type="number" name="quantity" min="0.01" step="0.01" value="{{ old('quantity') }}" placeholder="e.g. 20" required>
                 </div>
                 @error('quantity')<small class="production-field-error">{{ $message }}</small>@enderror
             </div>
@@ -154,7 +154,7 @@
                     </div>
 
                     <div class="ingredient-qty-cell">
-                        <input type="number" name="ingredients[{{ $idx }}][quantity]" min="0.001" step="0.001" value="{{ $line['quantity'] ?? '' }}" placeholder="Qty" required data-ingredient-qty>
+                        <input type="number" name="ingredients[{{ $idx }}][quantity]" min="0.01" step="0.01" value="{{ $line['quantity'] ?? '' }}" placeholder="Qty" required data-ingredient-qty>
                     </div>
 
                     <div class="ingredient-usable-cell" data-stock-indicator>
@@ -207,7 +207,7 @@
         </div>
 
         <div class="ingredient-qty-cell">
-            <input type="number" data-name="quantity" min="0.001" step="0.001" placeholder="Qty" required data-ingredient-qty>
+            <input type="number" data-name="quantity" min="0.01" step="0.01" placeholder="Qty" required data-ingredient-qty>
         </div>
 
         <div class="ingredient-usable-cell" data-stock-indicator>

@@ -21,13 +21,19 @@ class PermissionCatalog
                 'materials.import' => 'Import materials',
                 'materials.export' => 'Export and print materials',
             ],
+            'Finished goods' => [
+                'finished_goods.view' => 'View finished goods',
+            ],
+            'Semi finished goods' => [
+                'semi_finished_goods.view' => 'View semi finished goods',
+            ],
             'Lots & expiry' => [
                 'lots.view' => 'View lots',
                 'lots.create' => 'Receive lots',
             ],
-            'Production' => [
-                'production.view' => 'View production',
-                'production.create' => 'Record production',
+            'Products' => [
+                'production.view' => 'View products',
+                'production.create' => 'Define products and recipes',
             ],
             'Purchases' => [
                 'purchases.view' => 'View purchases',
@@ -47,6 +53,12 @@ class PermissionCatalog
                 'categories.create' => 'Add categories',
                 'categories.edit' => 'Edit categories',
                 'categories.delete' => 'Delete categories',
+            ],
+            'Storage locations' => [
+                'storage_locations.view' => 'View storage locations',
+                'storage_locations.create' => 'Add storage locations',
+                'storage_locations.edit' => 'Edit storage locations',
+                'storage_locations.delete' => 'Delete storage locations',
             ],
             'Stock' => [
                 'movements.view' => 'View stock movements',
@@ -95,6 +107,9 @@ class PermissionCatalog
             'categories.create' => 'categories.view',
             'categories.edit' => 'categories.view',
             'categories.delete' => 'categories.view',
+            'storage_locations.create' => 'storage_locations.view',
+            'storage_locations.edit' => 'storage_locations.view',
+            'storage_locations.delete' => 'storage_locations.view',
             'adjustments.create' => 'movements.view',
             'settings.update' => 'settings.view',
         ];

@@ -1,13 +1,13 @@
 @extends('layouts.app')
 @section('page-class', 'materials-index-page')
-@section('title', $currentType === 'product' ? 'Production Products' : ($currentType === 'material' ? 'Materials' : 'All Catalogue'))
-@section('subtitle', $currentType === 'product' ? 'Your manufactured goods, formulations, and batch inventory records.' : ($currentType === 'material' ? 'Your chemical catalogue, raw materials and stock levels.' : 'Comprehensive catalogue of raw chemical materials and manufactured production products.'))
+@section('title', $currentType === 'product' ? 'Packagings and Cans' : ($currentType === 'material' ? 'Raw Materials' : 'Raw Materials & Packagings'))
+@section('subtitle', $currentType === 'product' ? 'Your packaging supplies, bottles, cans, drums, and container inventory.' : ($currentType === 'material' ? 'Your chemical catalogue, raw materials and stock levels.' : 'Comprehensive catalogue of raw materials, chemical stock, and packaging containers.'))
 @section('actions')
     @if(auth()->user()->hasPermission('materials.create'))
         @if($currentType === 'product')
-            <a class="button button-primary" href="{{ route('materials.create', ['type' => 'product']) }}">＋ Add product</a>
+            <a class="button button-primary" href="{{ route('materials.create', ['type' => 'product']) }}">＋ Add packaging / can</a>
         @else
-            <a class="button button-primary" href="{{ route('materials.create', ['type' => 'material']) }}">＋ Add material</a>
+            <a class="button button-primary" href="{{ route('materials.create', ['type' => 'material']) }}">＋ Add raw material</a>
         @endif
     @endif
 @endsection
@@ -64,7 +64,7 @@
         </a>
         <a class="type-pill {{ $currentType === 'product' ? 'active' : '' }}" href="{{ route('materials.index', array_merge(request()->except(['page', 'category_id']), ['type' => 'product'])) }}">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m12 2 8 4.5v10L12 21l-8-4.5v-10L12 2Z"/><path d="m4 6.5 8 4.5 8-4.5M12 11v10"/></svg>
-            <span>Production Products</span>
+            <span>Packagings and Cans</span>
             <span class="type-badge">{{ number_format($typeCounts['product']) }}</span>
         </a>
         <a class="type-pill {{ $currentType === 'all' ? 'active' : '' }}" href="{{ route('materials.index', array_merge(request()->except(['page', 'category_id']), ['type' => 'all'])) }}">
@@ -86,7 +86,7 @@
                 <span class="sr-only">Filter by category</span>
                 <span aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><rect x="3" y="3" width="5" height="5" rx="1"/><rect x="10" y="3" width="5" height="5" rx="1"/><rect x="17" y="3" width="4" height="5" rx="1"/><rect x="3" y="10" width="5" height="5" rx="1"/><rect x="10" y="10" width="5" height="5" rx="1"/><rect x="17" y="10" width="4" height="5" rx="1"/><rect x="3" y="17" width="5" height="4" rx="1"/><rect x="10" y="17" width="5" height="4" rx="1"/><rect x="17" y="17" width="4" height="4" rx="1"/></svg></span>
                 <select name="category_id" aria-label="Filter by category">
-                    <option value="">{{ $currentType === 'product' ? 'All product categories' : 'All categories' }}</option>
+                    <option value="">{{ $currentType === 'product' ? 'All packaging categories' : 'All categories' }}</option>
                     @foreach($categories as $category)
                         <option value="{{ $category->id }}" @selected((string) request('category_id') === (string) $category->id)>{{ $category->name }}</option>
                     @endforeach
@@ -131,14 +131,15 @@
                         @if($currentType === 'all')
                             <th>Type</th>
                         @endif
-                        <th>{{ $currentType === 'product' ? 'Product' : 'Material' }}</th>
-                        <th>{{ $currentType === 'product' ? 'Recipe / Formulation' : 'CAS no.' }}</th>
+                        <th>{{ $currentType === 'product' ? 'Packaging / Can' : 'Material' }}</th>
+                        <th>{{ $currentType === 'product' ? 'Packaging Type' : 'CAS no.' }}</th>
                         <th>Category</th>
                         <th>On hand</th>
-                        <th>Reorder at</th>
+                        <th>{{ $currentType === 'product' ? 'Reorder remaining' : 'Reorder at' }}</th>
                         <th>Next expiry</th>
                         <th>Location</th>
                         <th>Status</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -160,12 +161,14 @@
                             <a class="table-primary" href="{{ route('materials.show', $material) }}">{{ $material->name }}</a>
                             <small class="table-secondary">{{ $material->stock_unit }}</small>
                         </td>
-                        <td data-label="CAS No.">
+                        <td data-label="{{ $isProd ? 'Packaging Type' : 'CAS No.' }}">
                             @if($isProd)
-                                @if($material->recipes->isNotEmpty())
+                                @if($material->packaging_type)
+                                    <span style="display: inline-block; padding: 2px 8px; border-radius: 6px; background: #f1f5f9; color: #334155; font-size: 11.5px; font-weight: 600; border: 1px solid #e2e8f0;">{{ $material->packaging_type }}</span>
+                                @elseif($material->recipes->isNotEmpty())
                                     <span style="font-size: 11.5px; font-weight: 600; color: #087f70;">{{ $material->recipes->count() }} {{ \Illuminate\Support\Str::plural('ingredient', $material->recipes->count()) }}</span>
                                 @else
-                                    <span style="color: #94a3b8; font-size: 12px;">No recipe</span>
+                                    <span style="color: #94a3b8; font-size: 12px;">—</span>
                                 @endif
                             @else
                                 {{ $material->cas_number ?: '—' }}
@@ -176,8 +179,8 @@
                                 {{ $isProd ? ($material->productCategory?->name ?? 'Uncategorized') : ($material->category?->name ?? 'Uncategorized') }}
                             </span>
                         </td>
-                        <td data-label="On Hand"><strong>{{ number_format($onHand, 3) }}</strong> {{ $material->stock_unit }}</td>
-                        <td data-label="Reorder At">{{ number_format((float) $material->reorder_level, 3) }} {{ $material->stock_unit }}</td>
+                        <td data-label="On Hand"><strong>{{ number_format($onHand, 2) }}</strong> {{ $material->stock_unit }}</td>
+                        <td data-label="Reorder At">{{ number_format((float) $material->reorder_level, 2) }} {{ $material->stock_unit }}</td>
                         <td data-label="Next Expiry">
                             @if($material->next_expiry_date)
                                 <span class="{{ $isExpiring ? 'materials-expiry-soon' : '' }}">{{ \Illuminate\Support\Carbon::parse($material->next_expiry_date)->format('Y-m-d') }}</span>
@@ -187,10 +190,29 @@
                         </td>
                         <td data-label="Location">{{ $material->storage_location ?: $material->effective_storage_location ?: '—' }}</td>
                         <td data-label="Status"><span class="badge {{ $status === 'In stock' ? 'badge-success' : ($status === 'Low stock' ? 'badge-warning' : ($status === 'Out of stock' ? 'badge-danger' : 'badge-neutral')) }}">{{ $status }}</span></td>
+                        <td data-label="Actions" class="actions-cell">
+                            <div class="goods-table-actions">
+                                @if(auth()->user()->hasPermission('materials.edit'))
+                                    <a class="row-action" href="{{ route('materials.edit', $material) }}">Edit</a>
+                                @endif
+                                @if(auth()->user()->hasPermission('materials.delete'))
+                                    <form method="POST"
+                                          action="{{ route('materials.destroy', $material) }}"
+                                          data-confirm="Delete “{{ $material->name }}” from the active catalogue? This action cannot be undone."
+                                          data-confirm-title="Delete {{ $isProd ? 'packaging / item' : 'raw material' }}?"
+                                          data-confirm-action="Delete"
+                                          data-confirm-tone="danger">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button class="row-action danger-link" type="submit">Delete</button>
+                                    </form>
+                                @endif
+                            </div>
+                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="{{ $currentType === 'all' ? 10 : 9 }}">
+                        <td colspan="{{ $currentType === 'all' ? 11 : 10 }}">
                             <div class="empty-state">
                                 <span class="empty-mark">▤</span>
                                 <strong>No {{ $currentType === 'product' ? 'products' : 'materials' }} found</strong>

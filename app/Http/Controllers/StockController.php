@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Material;
 use App\Models\MaterialLot;
 use App\Models\StockMovement;
+use App\Models\StorageLocation;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -32,6 +33,7 @@ class StockController extends Controller
     {
         return view('stock.receive-lot', [
             'materials' => Material::where('is_active', true)->orderBy('name')->get(),
+            'storageLocations' => StorageLocation::where('is_active', true)->orderBy('name')->get(),
             'selectedMaterial' => $request->integer('material_id'),
         ]);
     }
@@ -135,5 +137,15 @@ class StockController extends Controller
             ->latest()->paginate(25)->withQueryString();
 
         return view('stock.movements', compact('movements'));
+    }
+
+    public function destroyLot(MaterialLot $lot): RedirectResponse
+    {
+        $lotNumber = $lot->lot_number;
+        $lot->delete();
+
+        return redirect()->route('lots.index')
+            ->with('warning_title', 'Stock Lot Deleted')
+            ->with('warning', "Lot “{$lotNumber}” was deleted.");
     }
 }

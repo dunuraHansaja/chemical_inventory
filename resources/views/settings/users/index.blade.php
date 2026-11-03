@@ -23,7 +23,23 @@
                     <td>{{ $user->email }}</td>
                     <td>{{ $user->role?->name ?? 'No role assigned' }}</td>
                     <td><span class="badge {{ $user->is_active ? 'badge-success' : 'badge-neutral' }}">{{ $user->is_active ? 'Active' : 'Inactive' }}</span></td>
-                    <td class="actions-cell"><a class="row-action" href="{{ route('settings.users.edit', $user) }}">Edit account</a></td>
+                    <td class="actions-cell">
+                        <div class="goods-table-actions">
+                            <a class="row-action" href="{{ route('settings.users.edit', $user) }}">Edit account</a>
+                            @if(!auth()->user()->is($user))
+                                <form method="POST"
+                                      action="{{ route('settings.users.destroy', $user) }}"
+                                      data-confirm="Delete user account “{{ $user->name }}”? This action cannot be undone."
+                                      data-confirm-title="Delete user account?"
+                                      data-confirm-action="Delete"
+                                      data-confirm-tone="danger">
+                                    @csrf
+                                    @method('DELETE')
+                                    <button class="row-action danger-link" type="submit">Delete</button>
+                                </form>
+                            @endif
+                        </div>
+                    </td>
                 </tr>
             @empty
                 <tr><td colspan="5"><div class="empty-state"><strong>No user accounts</strong><p>Create an account and assign a role to grant system access.</p></div></td></tr>

@@ -6,6 +6,8 @@ use App\Models\Category;
 use App\Models\Material;
 use App\Models\MaterialLot;
 use App\Models\ProductCategory;
+use App\Models\StockMovement;
+use App\Models\StorageLocation;
 use App\Models\Supplier;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
@@ -36,14 +38,21 @@ class MaterialController extends Controller
             'material' => Material::where('is_active', true)
                 ->where(function ($q) {
                     $q->where('materials.type', 'material')
-                      ->whereNull('materials.product_category_id');
+                      ->whereNull('materials.product_category_id')
+                      ->whereNull('materials.packaging_type');
                 })->count(),
             'product' => Material::where('is_active', true)
+                ->whereNotNull('materials.packaging_type')
+                ->count(),
+            'all' => Material::where('is_active', true)
                 ->where(function ($q) {
-                    $q->where('materials.type', 'product')
-                      ->orWhereNotNull('materials.product_category_id');
+                    $q->whereNotNull('materials.packaging_type')
+                      ->orWhere(function ($sq) {
+                          $sq->where('materials.type', 'material')
+                             ->whereNull('materials.product_category_id')
+                             ->whereNull('materials.packaging_type');
+                      });
                 })->count(),
-            'all' => Material::where('is_active', true)->count(),
         ];
 
         $materials = $this->listingQuery($request, $currentType)
@@ -55,11 +64,18 @@ class MaterialController extends Controller
         $typeCondition = function ($q) use ($currentType) {
             if ($currentType === 'material') {
                 $q->where('materials.type', 'material')
-                  ->whereNull('materials.product_category_id');
+                  ->whereNull('materials.product_category_id')
+                  ->whereNull('materials.packaging_type');
             } elseif ($currentType === 'product') {
+                $q->whereNotNull('materials.packaging_type');
+            } else {
                 $q->where(function ($sq) {
-                    $sq->where('materials.type', 'product')
-                       ->orWhereNotNull('materials.product_category_id');
+                    $sq->whereNotNull('materials.packaging_type')
+                       ->orWhere(function ($mq) {
+                           $mq->where('materials.type', 'material')
+                              ->whereNull('materials.product_category_id')
+                              ->whereNull('materials.packaging_type');
+                       });
                 });
             }
         };
@@ -119,7 +135,48 @@ class MaterialController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $material = Material::create($this->validated($request));
+        $initialQuantity = $request->filled('initial_purchase_quantity')
+            ? (float) $request->input('initial_purchase_quantity')
+            : ($request->filled('initial_quantity') ? (float) $request->input('initial_quantity') : 0.0);
+
+        $materialData = $this->validated($request);
+
+        $material = DB::transaction(function () use ($materialData, $initialQuantity, $request) {
+            $material = Material::create($materialData);
+
+            if ($initialQuantity > 0) {
+                $lotNumber = 'INIT-' . $material->item_code;
+                $counter = 1;
+                while (MaterialLot::where('material_id', $material->id)->where('lot_number', $lotNumber)->exists()) {
+                    $lotNumber = 'INIT-' . $material->item_code . '-' . $counter;
+                    $counter++;
+                }
+
+                $lot = MaterialLot::create([
+                    'material_id' => $material->id,
+                    'lot_number' => $lotNumber,
+                    'quantity_received' => $initialQuantity,
+                    'quantity_on_hand' => $initialQuantity,
+                    'unit_cost' => $material->cost_per_unit,
+                    'storage_location' => $material->storage_location,
+                    'status' => 'active',
+                    'notes' => 'Initial purchase quantity',
+                    'manufactured_date' => today()->toDateString(),
+                ]);
+
+                StockMovement::create([
+                    'material_id' => $material->id,
+                    'material_lot_id' => $lot->id,
+                    'movement_type' => 'purchase_receipt',
+                    'quantity' => $initialQuantity,
+                    'balance_after' => $initialQuantity,
+                    'notes' => 'Initial purchase quantity',
+                    'created_by' => $request->user()?->id,
+                ]);
+            }
+
+            return $material;
+        });
 
         $itemLabel = $material->type === 'product' ? 'product' : 'material';
 
@@ -143,7 +200,60 @@ class MaterialController extends Controller
 
     public function update(Request $request, Material $material): RedirectResponse
     {
-        $material->update($this->validated($request, $material));
+        $initialQuantity = $request->filled('initial_purchase_quantity')
+            ? (float) $request->input('initial_purchase_quantity')
+            : ($request->filled('initial_quantity') ? (float) $request->input('initial_quantity') : null);
+
+        $materialData = $this->validated($request, $material);
+
+        DB::transaction(function () use ($material, $materialData, $initialQuantity, $request) {
+            $material->update($materialData);
+
+            if ($initialQuantity !== null && $initialQuantity > 0) {
+                if ($material->lots()->doesntExist()) {
+                    $lotNumber = 'INIT-' . $material->item_code;
+                    $counter = 1;
+                    while (MaterialLot::where('material_id', $material->id)->where('lot_number', $lotNumber)->exists()) {
+                        $lotNumber = 'INIT-' . $material->item_code . '-' . $counter;
+                        $counter++;
+                    }
+
+                    $lot = MaterialLot::create([
+                        'material_id' => $material->id,
+                        'lot_number' => $lotNumber,
+                        'quantity_received' => $initialQuantity,
+                        'quantity_on_hand' => $initialQuantity,
+                        'unit_cost' => $material->cost_per_unit,
+                        'storage_location' => $material->storage_location,
+                        'status' => 'active',
+                        'notes' => 'Initial purchase quantity',
+                        'manufactured_date' => today()->toDateString(),
+                    ]);
+
+                    StockMovement::create([
+                        'material_id' => $material->id,
+                        'material_lot_id' => $lot->id,
+                        'movement_type' => 'purchase_receipt',
+                        'quantity' => $initialQuantity,
+                        'balance_after' => $initialQuantity,
+                        'notes' => 'Initial purchase quantity',
+                        'created_by' => $request->user()?->id,
+                    ]);
+                } elseif ($material->lots()->count() === 1 && $material->stockMovements()->count() <= 1) {
+                    $firstLot = $material->lots()->first();
+                    if ($firstLot && (float) $firstLot->quantity_received !== $initialQuantity) {
+                        $firstLot->update([
+                            'quantity_received' => $initialQuantity,
+                            'quantity_on_hand' => $initialQuantity,
+                        ]);
+                        $material->stockMovements()->where('material_lot_id', $firstLot->id)->update([
+                            'quantity' => $initialQuantity,
+                            'balance_after' => $initialQuantity,
+                        ]);
+                    }
+                }
+            }
+        });
 
         $itemLabel = $material->type === 'product' ? 'product' : 'material';
 
@@ -211,9 +321,9 @@ class MaterialController extends Controller
                     $material->cas_number,
                     $categoryName,
                     $material->stock_unit,
-                    $onHand,
-                    $material->reorder_level,
-                    $material->cost_per_unit,
+                    number_format($onHand, 2, '.', ''),
+                    number_format((float) $material->reorder_level, 2, '.', ''),
+                    $material->cost_per_unit !== null ? number_format((float) $material->cost_per_unit, 2, '.', '') : null,
                     $material->effective_storage_location ?? $material->storage_location,
                     $material->preferredSupplier?->name,
                     $this->materialStatus($material, $onHand),
@@ -274,16 +384,23 @@ class MaterialController extends Controller
                     ->limit(1),
             ]);
 
-        // Filter by item type: material, product, or all
+        // Filter by item type: material (raw materials), product (packagings & cans), or all
         if ($currentType === 'material') {
             $query->where(function ($q) {
                 $q->where('materials.type', 'material')
-                  ->whereNull('materials.product_category_id');
+                  ->whereNull('materials.product_category_id')
+                  ->whereNull('materials.packaging_type');
             });
         } elseif ($currentType === 'product') {
+            $query->whereNotNull('materials.packaging_type');
+        } else {
             $query->where(function ($q) {
-                $q->where('materials.type', 'product')
-                  ->orWhereNotNull('materials.product_category_id');
+                $q->whereNotNull('materials.packaging_type')
+                  ->orWhere(function ($sq) {
+                      $sq->where('materials.type', 'material')
+                         ->whereNull('materials.product_category_id')
+                         ->whereNull('materials.packaging_type');
+                  });
             });
         }
 
@@ -397,6 +514,7 @@ class MaterialController extends Controller
                     'item_code' => ['required', 'string', 'max:50', 'unique:materials,item_code'],
                     'name' => ['required', 'string', 'max:255'],
                     'type' => ['nullable', Rule::in(['material', 'product'])],
+                    'packaging_type' => ['nullable', 'string', 'max:100'],
                     'stock_unit' => ['required', 'string', 'max:20'],
                     'reorder_level' => ['required', 'numeric', 'min:0'],
                     'cost_per_unit' => ['nullable', 'numeric', 'min:0'],
@@ -431,10 +549,12 @@ class MaterialController extends Controller
             'item_code' => ['required', 'string', 'max:50', Rule::unique('materials', 'item_code')->ignore($material?->id)],
             'name' => ['required', 'string', 'max:255'],
             'type' => ['nullable', Rule::in(['material', 'product'])],
+            'packaging_type' => ['nullable', 'string', 'max:100'],
             'cas_number' => ['nullable', 'string', 'max:50'],
             'category_id' => ['nullable', 'exists:categories,id'],
             'product_category_id' => ['nullable', 'exists:product_categories,id'],
             'stock_unit' => ['required', 'string', 'max:20'],
+            'initial_purchase_quantity' => ['nullable', 'numeric', 'min:0'],
             'reorder_level' => ['required', 'numeric', 'min:0'],
             'cost_per_unit' => ['nullable', 'numeric', 'min:0'],
             'storage_location' => ['nullable', 'string', 'max:255'],
@@ -444,24 +564,42 @@ class MaterialController extends Controller
             'is_active' => ['sometimes', 'boolean'],
         ]);
 
-        $type = $data['type'] ?? ($request->filled('product_category_id') ? 'product' : ($material?->type ?? 'material'));
+        $type = $data['type'] ?? ($request->filled('packaging_type') ? 'product' : ($material?->type ?? 'material'));
         $data['type'] = $type;
+
+        if ($type === 'product' && empty($data['packaging_type'])) {
+            $data['packaging_type'] = $material?->packaging_type ?: 'Other';
+        } elseif ($type === 'material') {
+            $data['packaging_type'] = null;
+        }
+
+        unset($data['initial_purchase_quantity']);
 
         return array_merge($data, [
             'hazard_classes' => collect(explode(',', (string) $request->input('hazard_classes')))
                 ->map(fn ($hazard) => trim($hazard))->filter()->values()->all(),
-            'is_active' => $request->boolean('is_active'),
+            'is_active' => $request->has('is_active') ? $request->boolean('is_active') : ($material?->is_active ?? true),
         ]);
     }
 
     private function formData(Material $material): array
     {
+        $initialPurchaseQuantity = null;
+        if ($material->exists) {
+            $firstLot = $material->lots()->orderBy('id')->first();
+            if ($firstLot) {
+                $initialPurchaseQuantity = (float) $firstLot->quantity_received;
+            }
+        }
+
         return [
             'material' => $material,
             'categories' => Category::where('is_active', true)->orderBy('name')->get(),
             'productCategories' => ProductCategory::where('is_active', true)->orderBy('name')->get(),
             'suppliers' => Supplier::where('is_active', true)->orderBy('name')->get(),
+            'storageLocations' => StorageLocation::where('is_active', true)->orderBy('name')->get(),
             'hazardClasses' => implode(', ', $material->hazard_classes ?? []),
+            'initialPurchaseQuantity' => $initialPurchaseQuantity,
         ];
     }
 }

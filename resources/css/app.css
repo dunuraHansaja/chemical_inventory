@@ -2437,18 +2437,80 @@ dialog.profile-dialog,
     font-size: 11.5px;
     font-weight: 500;
 }
+.production-product-menu-wrap {
+    position: relative;
+    margin-left: auto;
+    flex-shrink: 0;
+}
 .production-product-menu {
     border: none;
     background: transparent;
     color: #94a3b8;
     font-size: 17px;
     line-height: 1;
-    padding: 0 2px;
+    width: 28px;
+    height: 28px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    border-radius: 4px;
+    border-radius: 6px;
+    transition: background 0.15s ease, color 0.15s ease;
 }
-.production-product-menu:hover {
+.production-product-menu:hover,
+.production-product-menu[aria-expanded="true"] {
+    color: #1e293b;
+    background: #f1f5f9;
+}
+.production-product-dropdown {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    min-width: 132px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.12), 0 4px 10px -2px rgba(15, 23, 42, 0.06);
+    padding: 5px;
+    z-index: 50;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.production-product-dropdown[hidden] {
+    display: none !important;
+}
+.production-delete-form {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+.production-dropdown-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
     color: #334155;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.12s ease, color 0.12s ease;
+}
+.production-dropdown-item:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+}
+.production-dropdown-item-danger {
+    color: #dc2626;
+}
+.production-dropdown-item-danger:hover {
+    background: #fef2f2;
+    color: #b91c1c;
 }
 .production-product-meta {
     display: flex;
@@ -3708,3 +3770,740 @@ form.production-card-form:not(.production-create-panel form) .production-form-ac
     margin-top: 2px;
 }
 
+/* ========================================================
+   PROFESSIONAL FORM & HAZARD INDICATOR ENHANCEMENTS
+   ======================================================== */
+
+/* Ensure card, checkbox, radio, and pill labels NEVER stack vertically */
+.app-shell label.checkbox-label,
+.app-shell label.material-type-card,
+.app-shell label.active-status-card,
+.app-shell label.hazard-class-card,
+.app-shell label.production-type-checkbox-card,
+.app-shell label.permission-option,
+.app-shell label.user-active-checkbox-label,
+.app-shell label.user-avatar-upload-pill,
+.app-shell label.user-avatar-remove-pill,
+.app-shell label.profile-avatar-upload {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    text-align: left !important;
+}
+
+.app-shell .checkbox-label {
+    gap: 14px !important;
+    padding: 15px 18px !important;
+    background: #f8fafc !important;
+    border: 1.5px solid #e2e8f0 !important;
+    border-radius: 12px !important;
+    transition: all 0.16s ease !important;
+}
+
+.app-shell .checkbox-label:hover {
+    background: #f1f5f9 !important;
+    border-color: #cbd5e1 !important;
+}
+
+.app-shell .checkbox-label:has(input:checked) {
+    background: #f0fdfa !important;
+    border-color: #087f70 !important;
+    box-shadow: 0 0 0 1px rgba(8, 127, 112, 0.15);
+}
+
+.app-shell .checkbox-card-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.app-shell .checkbox-card-copy strong {
+    font-size: 13.5px;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.25;
+}
+
+.app-shell .checkbox-card-copy small {
+    font-size: 12px;
+    font-weight: 450;
+    color: #64748b;
+    line-height: 1.35;
+    margin: 0 !important;
+}
+
+/* Product Classification Checkboxes in Add/Edit Product Drawer */
+.production-type-checkboxes {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 6px;
+}
+
+.production-type-checkbox-card,
+.app-shell .production-create-panel label.production-type-checkbox-card {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    padding: 11px 14px !important;
+    border: 1.5px solid #e2e8f0 !important;
+    border-radius: 10px !important;
+    background: #ffffff !important;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    margin: 0 !important;
+}
+
+.production-type-checkbox-card:hover,
+.app-shell .production-create-panel label.production-type-checkbox-card:hover {
+    border-color: #cbd5e1 !important;
+    background: #f8fafc !important;
+}
+
+.production-type-checkbox-card:has(input:checked),
+.app-shell .production-create-panel label.production-type-checkbox-card:has(input:checked) {
+    border-color: #2563eb !important;
+    background: #eff6ff !important;
+    box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.15);
+}
+
+.production-type-checkbox-card input[type="checkbox"] {
+    width: 17px !important;
+    height: 17px !important;
+    min-height: 17px !important;
+    margin: 0 !important;
+    accent-color: #2563eb;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.production-type-checkbox-card span {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+    line-height: 1.25;
+}
+
+/* Hazard Class Badges on Material Show Page */
+.hazard-pills-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.hazard-pill-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11.5px;
+    font-weight: 650;
+    color: #b45309;
+    background: #fffbeb;
+    border: 1px solid #fde68a;
+}
+
+.hazard-pill-badge svg {
+    color: #d97706;
+    flex-shrink: 0;
+}
+
+/* ========================================================
+   INLINE REQUIRED ASTERISK FIX & MULTI-ITEM PURCHASE FORM
+   ======================================================== */
+
+/* Keep label text and <span class="required">*</span> on the same line across all standard forms */
+.app-shell .form-grid > label:not(.checkbox-label),
+.app-shell .line-item > label {
+    display: block !important;
+}
+
+.app-shell .form-grid > label:not(.checkbox-label) > input:not([type=checkbox]):not([type=radio]):not([type=file]),
+.app-shell .form-grid > label:not(.checkbox-label) > select,
+.app-shell .form-grid > label:not(.checkbox-label) > textarea,
+.app-shell .line-item > label > input:not([type=checkbox]):not([type=radio]):not([type=file]),
+.app-shell .line-item > label > select,
+.app-shell .line-item > label > textarea {
+    display: block;
+    width: 100%;
+    margin-top: 6px;
+}
+
+.app-shell .form-grid > label:not(.checkbox-label) > small,
+.app-shell .line-item > label > small {
+    display: block;
+    margin-top: 5px;
+}
+
+/* Purchase Order Multi-Item Header & Toolbar */
+.app-shell .purchase-lines-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.app-shell .purchase-lines-toolbar {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.app-shell .purchase-items-count-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 5px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #0f766e;
+    background: #ccfbf1;
+    border: 1px solid #99f6e4;
+}
+
+/* Multi-Item Line Row Layout */
+.app-shell .line-item.purchase-line-item {
+    display: grid;
+    grid-template-columns: 38px minmax(220px, 2.2fr) minmax(130px, 1fr) minmax(130px, 1fr) minmax(120px, 0.9fr) 42px;
+    align-items: end;
+    gap: 14px;
+    padding: 16px 18px;
+    border: 1.5px solid #e2e8f0;
+    border-radius: 12px;
+    background: #f8fafc;
+}
+
+.app-shell .line-item.purchase-line-item:hover {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.04);
+}
+
+.app-shell .purchase-line-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 42px;
+    padding: 0 8px;
+    border-radius: 8px;
+    background: #e2e8f0;
+    color: #334155;
+    font-size: 12px;
+    font-weight: 700;
+    user-select: none;
+}
+
+.app-shell .purchase-field-label-inline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.app-shell .purchase-unit-pill {
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: #087f70 !important;
+    margin: 0 !important;
+}
+
+.app-shell .purchase-line-total-box {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 6px;
+}
+
+.app-shell .purchase-line-total-label {
+    font-size: 12.5px;
+    font-weight: 600;
+    color: #475569;
+    line-height: 1.25;
+}
+
+.app-shell .purchase-line-total-value {
+    display: flex;
+    align-items: center;
+    height: 42px;
+    padding: 0 12px;
+    border-radius: 8px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    color: #0f172a;
+    font-size: 13.5px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.app-shell .purchase-add-row-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 42px;
+    margin-top: 12px;
+    padding: 10px 16px;
+    border: 1.5px dashed #cbd5e1;
+    border-radius: 10px;
+    background: #f8fafc;
+    color: #087f70;
+    font-size: 13px;
+    font-weight: 650;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.app-shell .purchase-add-row-banner:hover {
+    border-color: #087f70;
+    background: #f0fdfa;
+    color: #0f766e;
+}
+
+.app-shell .purchase-live-summary {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 18px;
+    padding: 16px 20px;
+    border-radius: 12px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+.app-shell .purchase-summary-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.app-shell .purchase-summary-metric > span {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+}
+
+.app-shell .purchase-summary-metric > strong {
+    font-size: 15px;
+    font-weight: 750;
+    color: #0f172a;
+}
+
+.app-shell .purchase-summary-grand > strong {
+    color: #087f70;
+    font-size: 16px;
+}
+
+.app-shell .purchase-items-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+}
+
+.app-shell .purchase-items-summary {
+    max-width: 320px;
+    line-height: 1.35;
+}
+
+@media (max-width: 860px) {
+    .app-shell .line-item.purchase-line-item {
+        grid-template-columns: 1fr;
+    }
+    .app-shell .purchase-live-summary {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+/* ========================================================
+   PRODUCT CLASSIFICATION BADGES & GOODS MODULE CARDS
+   ======================================================== */
+
+.production-classification-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    width: fit-content;
+    margin-top: 2px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1.3;
+}
+
+.production-classification-badge.is-finished {
+    color: #047857;
+    background: #ecfdf5;
+    border: 1px solid #a7f3d0;
+}
+
+.production-classification-badge.is-semi-finished {
+    color: #0369a1;
+    background: #f0f9ff;
+    border: 1px solid #bae6fd;
+}
+
+.production-classification-badge svg {
+    width: 12px;
+    height: 12px;
+    flex-shrink: 0;
+}
+
+.goods-module-card {
+    cursor: default;
+}
+
+.goods-card-edit-link {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 7px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #2563eb;
+    font-size: 11.5px;
+    font-weight: 650;
+    text-decoration: none;
+    transition: all 0.15s ease;
+    flex-shrink: 0;
+}
+
+.goods-card-edit-link:hover {
+    background: #eff6ff;
+    border-color: #bfdbfe;
+    color: #1d4ed8;
+}
+
+.goods-stock-inline {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 500;
+    margin-left: 3px;
+}
+
+.goods-recipe-preview {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.goods-recipe-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #64748b;
+}
+
+.goods-recipe-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.goods-recipe-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    color: #334155;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.goods-table-recipe-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    max-width: 340px;
+}
+
+.goods-table-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+
+/* ========================================================
+   Record Production Slide-Over Drawer (Finished & Semi-Finished Goods)
+   ======================================================== */
+
+.goods-produce-row-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    border-radius: 7px;
+    border: 1px solid #a7f3d0;
+    background: #ecfdf5;
+    color: #047857;
+    font-size: 12px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.goods-produce-row-btn:hover {
+    background: #d1fae5;
+    border-color: #6ee7b7;
+    color: #065f46;
+}
+
+.record-production-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.38);
+    backdrop-filter: blur(2px);
+    z-index: 90;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+}
+
+.record-production-backdrop.is-open {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+.record-production-drawer {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: min(520px, 100vw);
+    background: #ffffff;
+    border-left: 1px solid #e2e8f0;
+    box-shadow: -12px 0 36px rgba(15, 23, 42, 0.14);
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    transform: translateX(104%);
+    transition: transform 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.record-production-drawer.is-open {
+    transform: translateX(0);
+}
+
+.record-production-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+
+.record-production-eyebrow {
+    display: inline-block;
+    font-size: 10.5px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #087f70;
+    margin-bottom: 3px;
+}
+
+.record-production-header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 800;
+    color: #0f172a;
+}
+
+.record-production-header p {
+    margin: 4px 0 0;
+    font-size: 12.5px;
+    color: #64748b;
+}
+
+.record-production-form {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+}
+
+.record-production-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.record-production-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.record-prod-category-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    border: 1px solid #bfdbfe;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.record-unit-suffix {
+    position: absolute;
+    right: 12px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #475569;
+    background: #f1f5f9;
+    padding: 2px 7px;
+    border-radius: 5px;
+    pointer-events: none;
+}
+
+.record-recipe-section {
+    margin-top: 4px;
+    padding-top: 16px;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.record-recipe-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.record-recipe-scale-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: #f0fdfa;
+    border: 1px solid #99f6e4;
+    color: #0f766e;
+    font-size: 11.5px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.record-recipe-empty {
+    padding: 14px 16px;
+    border-radius: 10px;
+    border: 1px dashed #cbd5e1;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 12.5px;
+    line-height: 1.45;
+}
+
+.record-recipe-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.record-recipe-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1.3fr) auto 120px;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+}
+
+.record-recipe-row.is-short {
+    border-color: #fecaca;
+    background: #fef2f2;
+}
+
+.record-recipe-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+.record-recipe-info strong {
+    font-size: 13px;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.record-recipe-info small {
+    font-size: 11px;
+    color: #64748b;
+}
+
+.record-stock-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 8px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.record-stock-pill.stock-ok {
+    background: #ecfdf5;
+    color: #047857;
+    border: 1px solid #a7f3d0;
+}
+
+.record-stock-pill.stock-low {
+    background: #fef2f2;
+    color: #b91c1c;
+    border: 1px solid #fecaca;
+}
+
+.record-recipe-qty-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.record-recipe-qty-wrap input {
+    padding-right: 36px !important;
+    font-weight: 700 !important;
+    text-align: right;
+}
+
+.record-ing-unit {
+    position: absolute;
+    right: 9px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    pointer-events: none;
+}

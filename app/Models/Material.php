@@ -16,6 +16,7 @@ class Material extends Model
         'item_code',
         'name',
         'type',
+        'packaging_type',
         'cas_number',
         'category_id',
         'product_category_id',
@@ -39,7 +40,18 @@ class Material extends Model
 
     public function isProduct(): bool
     {
-        return ($this->type ?? 'material') === 'product' || $this->product_category_id !== null;
+        return in_array($this->type ?? 'material', ['product', 'finished_good', 'semi_finished_good'], true)
+            || $this->product_category_id !== null;
+    }
+
+    public function isSemiFinishedGood(): bool
+    {
+        return ($this->type ?? '') === 'semi_finished_good';
+    }
+
+    public function isFinishedGood(): bool
+    {
+        return $this->isProduct() && ! $this->isSemiFinishedGood();
     }
 
     public function isMaterial(): bool

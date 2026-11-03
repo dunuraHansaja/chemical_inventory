@@ -1,11 +1,11 @@
 @extends('layouts.app')
-@section('title', 'Production')
-@section('subtitle', 'Manage production records for your manufactured products.')
+@section('title', 'Products')
+@section('subtitle', 'Manage manufactured products and pre-defined formulation recipes.')
 @section('actions')
     @if(auth()->user()->hasPermission('production.create'))
         <a class="button button-primary production-create-action" href="{{ route('production.create') }}" id="production-create-toggle">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            <span>Create new Production</span>
+            <span>Add Product / Recipe</span>
         </a>
     @endif
 @endsection
@@ -109,6 +109,9 @@
                                     </svg>
                                     <span id="dynamic-card-qty">—</span>
                                 </span>
+                                <span class="production-classification-badge is-finished" id="dynamic-card-classification" data-preview-classification>
+                                    Finished Good
+                                </span>
                             </div>
                         </article>
                     </div>
@@ -154,22 +157,28 @@
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3 21 8v8l-9 5-9-5V8l9-5Z"/><path d="m3 8 9 5 9-5M12 13v8"/></svg>
                                         <span data-category-preview-qty>—</span>
                                     </span>
+                                    <span class="production-classification-badge is-finished" data-category-preview-classification>
+                                        Finished Good
+                                    </span>
                                 </div>
                             </article>
 
                             @forelse($group['products'] as $product)
+                                @if($product->isMaterial() || !empty($product->packaging_type))
+                                    @continue
+                                @endif
                                 @php
                                     $latestOutput = $product->stockMovements->first();
                                     $lot = $latestOutput?->materialLot ?? $product->lots->first();
                                     $code = $product->item_code;
                                     $cardColor = $colorMap[$code] ?? $palette[$loop->index % count($palette)];
                                     $prodDate = $latestOutput?->created_at?->format('Y-m-d') ?? $product->created_at?->format('Y-m-d');
-                                    $prodQty = $latestOutput?->quantity ?? $product->usable_stock ?? 0;
+                                    $prodQty = $product->recipes->isNotEmpty() ? 1 : ($latestOutput?->quantity ?? $product->usable_stock ?? 1);
 
                                     $productIngredients = $product->recipes->map(function ($r) {
                                         return [
                                             'material_id' => $r->material_id,
-                                            'quantity' => (float) $r->quantity,
+                                            'quantity' => number_format((float) $r->quantity, 2, '.', ''),
                                             'unit' => $r->material?->stock_unit ?? 'kg',
                                         ];
                                     });
@@ -182,7 +191,7 @@
                                                 ->get()
                                                 ->map(fn($it) => [
                                                     'material_id' => $it->material_id,
-                                                    'quantity' => (float) $it->quantity,
+                                                    'quantity' => number_format((float) $it->quantity, 2, '.', ''),
                                                     'unit' => $it->material?->stock_unit ?? 'kg',
                                                 ]);
                                         }
@@ -192,8 +201,9 @@
                                     data-product-id="{{ $product->id }}" 
                                     data-category-id="{{ $group['category_id'] }}"
                                     data-product-name="{{ $product->name }}"
+                                    data-product-type="{{ $product->type }}"
                                     data-product-code="{{ $product->item_code }}"
-                                    data-quantity="{{ rtrim(rtrim(number_format((float) $prodQty, 3), '0'), '.') }}"
+                                    data-quantity="{{ number_format((float) $prodQty, 2, '.', '') }}"
                                     data-unit="{{ $product->stock_unit }}"
                                     data-batch-number="{{ $lot?->lot_number ?? '' }}"
                                     data-date="{{ $prodDate }}"
@@ -212,7 +222,29 @@
                                             <strong title="{{ $product->name }}">{{ $product->name }}</strong>
                                             <small>{{ $product->item_code }}</small>
                                         </div>
-                                        <button type="button" class="production-product-menu" aria-label="Product options">⋮</button>
+                                        <div class="production-product-menu-wrap" data-product-menu-wrap>
+                                            <button type="button" class="production-product-menu" data-product-menu-toggle aria-label="Product options" aria-expanded="false">⋮</button>
+                                            <div class="production-product-dropdown" data-product-dropdown hidden>
+                                                <button type="button" class="production-dropdown-item" data-product-edit>
+                                                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                        <path d="M12 20h9"/>
+                                                        <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+                                                    </svg>
+                                                    <span>Edit</span>
+                                                </button>
+                                                <form method="POST" action="{{ route('production.destroy', $product) }}" class="production-delete-form" data-confirm="Are you sure you want to delete {{ $product->name }} and its formulation recipe?" data-confirm-title="Delete Product" data-confirm-action="Delete" data-confirm-tone="danger">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="production-dropdown-item production-dropdown-item-danger" data-product-delete>
+                                                        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                                            <polyline points="3 6 5 6 21 6"/>
+                                                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                                                        </svg>
+                                                        <span>Delete</span>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="production-product-meta">
                                         <span class="production-meta-row" title="Production Date">
@@ -229,7 +261,17 @@
                                                 <path d="M12 3 21 8v8l-9 5-9-5V8l9-5Z"/>
                                                 <path d="m3 8 9 5 9-5M12 13v8"/>
                                             </svg>
-                                            <span>{{ rtrim(rtrim(number_format((float) $prodQty, 2), '0'), '.') }} {{ $product->stock_unit }}</span>
+                                            <span>{{ number_format((float) $prodQty, 2) }} {{ $product->stock_unit }}</span>
+                                        </span>
+                                        @php($isSemiFinished = $product->type === 'semi_finished_good')
+                                        <span class="production-classification-badge {{ $isSemiFinished ? 'is-semi-finished' : 'is-finished' }}" title="Product Classification">
+                                            @if($isSemiFinished)
+                                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 12 9 5 9-5"/></svg>
+                                                <span>Semi Finished Good</span>
+                                            @else
+                                                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>
+                                                <span>Finished Good</span>
+                                            @endif
                                         </span>
                                         @if($lot)
                                             <span class="sr-only">
@@ -257,10 +299,10 @@
         @else
             <div class="production-empty-state">
                 <span class="empty-mark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/></svg></span>
-                <strong>{{ request()->filled('q') || request()->filled('category_id') ? 'No matching production records' : 'No production records yet' }}</strong>
-                <p>{{ request()->filled('q') || request()->filled('category_id') ? 'Try changing your search or category filter.' : 'Record a production run to see finished products grouped by category.' }}</p>
+                <strong>{{ request()->filled('q') || request()->filled('category_id') ? 'No matching products' : 'No products yet' }}@if(request()->filled('q') || request()->filled('category_id'))<span class="sr-only">No matching production records</span>@endif</strong>
+                <p>{{ request()->filled('q') || request()->filled('category_id') ? 'Try changing your search or category filter.' : 'Define a product and formulation recipe to see products grouped by category.' }}</p>
                 @if(auth()->user()->hasPermission('production.create'))
-                    <a class="button button-primary" href="{{ route('production.create') }}">Create new Production</a>
+                    <a class="button button-primary" href="{{ route('production.create') }}">Add Product / Recipe</a>
                 @endif
             </div>
         @endif
@@ -271,8 +313,8 @@
             <header class="production-create-panel-header">
                 <div>
                     <span class="production-edit-mode-badge" id="production-edit-mode-badge" style="display: none;">EDITING MODE</span>
-                    <h2 id="production-create-title">Create new Production</h2>
-                    <p id="production-create-subtitle">Record a new production entry for a product.</p>
+                    <h2 id="production-create-title">Add Product / Recipe</h2>
+                    <p id="production-create-subtitle">Define product details and formulation recipe ingredients.</p>
                 </div>
                 <button type="button" class="production-panel-close" id="production-panel-close-btn" aria-label="Close production form">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>

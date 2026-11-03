@@ -29,7 +29,10 @@
             <div class="span-2">
                 <label class="checkbox-label" for="category-is-active">
                     <input type="checkbox" id="category-is-active" name="is_active" value="1" @checked(old('is_active', $category->is_active ?? true))>
-                    <span>Active category</span>
+                    <span class="checkbox-card-copy">
+                        <strong>Active category</strong>
+                        <small>Enable this category for grouping raw materials and products across the catalogue.</small>
+                    </span>
                 </label>
             </div>
         </div>

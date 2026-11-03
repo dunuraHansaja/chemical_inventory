@@ -238,7 +238,7 @@ document.addEventListener('click', (event) => {
     if (addButton) {
         const listId = addButton.dataset.addLine;
         const list = document.getElementById(listId);
-        const template = document.getElementById(`${listId}-template`);
+        const template = document.getElementById(`${listId}-template`) || document.getElementById('purchase-line-template');
         if (!list || !template) return;
 
         const indexes = [...list.querySelectorAll('[name]')]
@@ -250,6 +250,7 @@ document.addEventListener('click', (event) => {
             field.removeAttribute('data-name');
         });
         list.append(row);
+        document.getElementById('purchase-order-form')?.dispatchEvent(new CustomEvent('purchase:lines-changed', { detail: { addedRow: row } }));
         return;
     }
 
@@ -257,7 +258,10 @@ document.addEventListener('click', (event) => {
     if (removeButton) {
         const row = removeButton.closest('[data-line-row]');
         const list = row?.parentElement;
-        if (row && list && list.querySelectorAll('[data-line-row]').length > 1) row.remove();
+        if (row && list && list.querySelectorAll('[data-line-row]').length > 1) {
+            row.remove();
+            document.getElementById('purchase-order-form')?.dispatchEvent(new CustomEvent('purchase:lines-changed'));
+        }
     }
 });
 
@@ -342,6 +346,28 @@ if (productionForm) {
     const newProductInput = productionForm.querySelector('#new-product-input');
     const toggleProductBtn = productionForm.querySelector('[data-toggle-new-product]');
     const toggleProductLabel = productionForm.querySelector('[data-toggle-product-label]');
+
+    // Goods type classification checkboxes
+    const finishedGoodCheckbox = document.getElementById('type-finished-good');
+    const semiFinishedGoodCheckbox = document.getElementById('type-semi-finished-good');
+
+    finishedGoodCheckbox?.addEventListener('change', () => {
+        if (finishedGoodCheckbox.checked && semiFinishedGoodCheckbox) {
+            semiFinishedGoodCheckbox.checked = false;
+        } else if (!finishedGoodCheckbox.checked && semiFinishedGoodCheckbox && !semiFinishedGoodCheckbox.checked) {
+            finishedGoodCheckbox.checked = true;
+        }
+        syncLivePreviewCard();
+    });
+
+    semiFinishedGoodCheckbox?.addEventListener('change', () => {
+        if (semiFinishedGoodCheckbox.checked && finishedGoodCheckbox) {
+            finishedGoodCheckbox.checked = false;
+        } else if (!semiFinishedGoodCheckbox.checked && finishedGoodCheckbox && !finishedGoodCheckbox.checked) {
+            finishedGoodCheckbox.checked = true;
+        }
+        syncLivePreviewCard();
+    });
 
     // Live preview elements on the page
     const dynamicGroup = document.getElementById('production-dynamic-group');
@@ -448,7 +474,7 @@ if (productionForm) {
         }
 
         if (textSpan) {
-            const formattedStock = Number.isInteger(stock) ? stock : stock.toFixed(1);
+            const formattedStock = stock.toFixed(2);
             textSpan.textContent = `${formattedStock} ${unit} usable`;
             textSpan.classList.toggle('has-stock', stock > 0);
             textSpan.classList.toggle('no-stock', stock <= 0);
@@ -485,26 +511,41 @@ if (productionForm) {
 
     const syncLivePreviewCard = () => {
         const isNewCat = newWrap && getComputedStyle(newWrap).display !== 'none';
-        const isNewProd = newProductWrap && getComputedStyle(newProductWrap).display !== 'none';
+        const isNewProd = Boolean(newProductInput?.value?.trim());
         const typedCat = newCatInput?.value?.trim() || 'New Category';
-        const typedProd = newProductInput?.value?.trim() || 'New Production';
-        const qtyVal = quantityInput?.value ? `${quantityInput.value} L` : '—';
+        const typedProd = newProductInput?.value?.trim() || 'New Product';
+        const qtyVal = '1.00 Unit';
+        const isSemiFinished = Boolean(semiFinishedGoodCheckbox?.checked);
+        const classLabel = isSemiFinished ? 'Semi Finished Good' : 'Finished Good';
 
         if (dynamicTitle) dynamicTitle.textContent = typedCat;
         if (dynamicCardName) dynamicCardName.textContent = typedProd;
         if (dynamicCardQty) dynamicCardQty.textContent = qtyVal;
+
+        const dynClassBadge = document.getElementById('dynamic-card-classification');
+        if (dynClassBadge) {
+            dynClassBadge.textContent = classLabel;
+            dynClassBadge.classList.toggle('is-semi-finished', isSemiFinished);
+            dynClassBadge.classList.toggle('is-finished', !isSemiFinished);
+        }
 
         // If in existing category mode, update preview card inside the visible category
         const selectedCatId = isNewCat ? '' : (categorySelect?.value || '');
         document.querySelectorAll('[data-category-preview-card]').forEach((card) => {
             const group = card.closest('[data-category-id]');
             const isMatch = group && String(group.dataset.categoryId) === selectedCatId;
-            if (isMatch && isNewProd) {
+            if (isMatch && isNewProd && !editingProductIdInput?.value) {
                 card.style.display = 'flex';
                 const nameEl = card.querySelector('[data-category-preview-name]');
                 const qtyEl = card.querySelector('[data-category-preview-qty]');
+                const classEl = card.querySelector('[data-category-preview-classification]');
                 if (nameEl) nameEl.textContent = typedProd;
                 if (qtyEl) qtyEl.textContent = qtyVal;
+                if (classEl) {
+                    classEl.textContent = classLabel;
+                    classEl.classList.toggle('is-semi-finished', isSemiFinished);
+                    classEl.classList.toggle('is-finished', !isSemiFinished);
+                }
             } else {
                 card.style.display = 'none';
             }
@@ -619,10 +660,10 @@ if (productionForm) {
         }
 
         // Update Drawer Header to Edit Mode
-        if (panelTitle) panelTitle.textContent = `Edit: ${productName}`;
-        if (panelSubtitle) panelSubtitle.textContent = `Modify units, batch, expiry, and ingredients for this product.`;
+        if (panelTitle) panelTitle.textContent = `Edit Recipe: ${productName}`;
+        if (panelSubtitle) panelSubtitle.textContent = `Modify formulation recipe ingredients (for 1 unit) for this product.`;
         if (editBadge) editBadge.style.display = 'inline-block';
-        if (submitLabel) submitLabel.textContent = 'Save changes';
+        if (submitLabel) submitLabel.textContent = 'Save Product & Recipe';
 
         // Set category
         if (catId && categorySelect) {
@@ -642,9 +683,19 @@ if (productionForm) {
             newProductInput.value = productName;
         }
 
-        // Set units (quantity)
+        // Set goods classification checkbox
+        const pType = card.dataset.productType || '';
+        if (pType === 'semi_finished_good' || pType === 'semi_finished') {
+            if (semiFinishedGoodCheckbox) semiFinishedGoodCheckbox.checked = true;
+            if (finishedGoodCheckbox) finishedGoodCheckbox.checked = false;
+        } else {
+            if (finishedGoodCheckbox) finishedGoodCheckbox.checked = true;
+            if (semiFinishedGoodCheckbox) semiFinishedGoodCheckbox.checked = false;
+        }
+
+        // Set units (quantity) - Recipe is always defined per 1 unit
         if (quantityInput) {
-            quantityInput.value = quantity;
+            quantityInput.value = '1';
         }
 
         // Set batch number
@@ -677,7 +728,7 @@ if (productionForm) {
                     const unitField = row.querySelector('[name$="[unit]"]');
 
                     if (matSelect) matSelect.value = ing.material_id;
-                    if (qtyField) qtyField.value = ing.quantity;
+                    if (qtyField) qtyField.value = ing.quantity !== undefined && ing.quantity !== '' ? Number(ing.quantity).toFixed(2) : '';
                     if (unitField && ing.unit) unitField.value = ing.unit;
 
                     ingredientsContainer.appendChild(row);
@@ -701,17 +752,19 @@ if (productionForm) {
         if (editingProductIdInput) editingProductIdInput.value = '';
 
         // Reset Drawer Header
-        if (panelTitle) panelTitle.textContent = 'Create new Production';
-        if (panelSubtitle) panelSubtitle.textContent = 'Record a new production entry for a product.';
+        if (panelTitle) panelTitle.textContent = 'Add Product / Recipe';
+        if (panelSubtitle) panelSubtitle.textContent = 'Define product details and formulation recipe for 1 unit.';
         if (editBadge) editBadge.style.display = 'none';
-        if (submitLabel) submitLabel.textContent = 'Record production';
+        if (submitLabel) submitLabel.textContent = 'Save Product & Recipe';
 
         // Reset fields
         showNewCategoryMode(false);
         showNewProductMode(false);
         if (categorySelect) categorySelect.value = '';
         if (productSelect) productSelect.value = '';
-        if (quantityInput) quantityInput.value = '';
+        if (quantityInput) quantityInput.value = '1';
+        if (finishedGoodCheckbox) finishedGoodCheckbox.checked = true;
+        if (semiFinishedGoodCheckbox) semiFinishedGoodCheckbox.checked = false;
         if (batchInput) batchInput.value = defaultBatchNo;
         if (expiryInput) expiryInput.value = '';
         if (noteInput) noteInput.value = '';
@@ -725,10 +778,58 @@ if (productionForm) {
 
     productionForm.addEventListener('production:reset-create', resetFormToCreateMode);
 
-    // Click on product card in the left list to pre-fill and edit details
+    const closeAllProductMenus = () => {
+        document.querySelectorAll('[data-product-dropdown]').forEach((dropdown) => {
+            dropdown.hidden = true;
+        });
+        document.querySelectorAll('[data-product-menu-toggle]').forEach((btn) => {
+            btn.setAttribute('aria-expanded', 'false');
+        });
+    };
+
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('[data-product-menu-wrap]')) {
+            closeAllProductMenus();
+        }
+    });
+
+    // Click on product card or its 3-dots menu in the left list
     document.getElementById('production-category-groups')?.addEventListener('click', (e) => {
+        const menuToggle = e.target.closest('[data-product-menu-toggle]');
+        if (menuToggle) {
+            e.preventDefault();
+            e.stopPropagation();
+            const wrap = menuToggle.closest('[data-product-menu-wrap]');
+            const dropdown = wrap?.querySelector('[data-product-dropdown]');
+            const isOpen = dropdown && !dropdown.hidden;
+            closeAllProductMenus();
+            if (dropdown && !isOpen) {
+                dropdown.hidden = false;
+                menuToggle.setAttribute('aria-expanded', 'true');
+            }
+            return;
+        }
+
+        const editBtn = e.target.closest('[data-product-edit]');
+        if (editBtn) {
+            e.preventDefault();
+            e.stopPropagation();
+            closeAllProductMenus();
+            const card = editBtn.closest('[data-product-id]');
+            if (card) populateFormForEdit(card);
+            return;
+        }
+
+        const deleteBtn = e.target.closest('[data-product-delete]') || e.target.closest('.production-delete-form');
+        if (deleteBtn) {
+            e.stopPropagation();
+            closeAllProductMenus();
+            return;
+        }
+
         const card = e.target.closest('[data-product-id]');
         if (!card) return;
+        closeAllProductMenus();
         populateFormForEdit(card);
     });
 
@@ -743,7 +844,14 @@ if (productionForm) {
     syncCatalogGroups();
     updateIngredientsEmptyHint();
 
-    // Initialize any existing rows
+    // Initialize any existing rows and handle ?edit=<product_id>
+    const editParamId = new URLSearchParams(window.location.search).get('edit');
+    if (editParamId) {
+        const targetCard = document.querySelector(`.production-product-card[data-product-id="${CSS.escape(editParamId)}"]`);
+        if (targetCard) {
+            populateFormForEdit(targetCard);
+        }
+    }
     ingredientsContainer?.querySelectorAll('[data-ingredient-row]').forEach((row) => {
         updateRowStock(row);
     });
@@ -793,17 +901,9 @@ if (productionWorkspace) {
 
     createToggleBtn?.addEventListener('click', (e) => {
         e.preventDefault();
-        const editingInput = document.getElementById('editing-product-id');
-        if (editingInput && editingInput.value) {
-            // If already in edit mode, reset back to clean create mode and open panel
-            document.getElementById('production-form')?.dispatchEvent(new CustomEvent('production:reset-create'));
-            productionWorkspace.classList.add('production-workspace-open');
-        } else {
-            productionWorkspace.classList.toggle('production-workspace-open');
-        }
-        if (productionWorkspace.classList.contains('production-workspace-open')) {
-            document.getElementById('production-create-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-        }
+        document.getElementById('production-form')?.dispatchEvent(new CustomEvent('production:reset-create'));
+        productionWorkspace.classList.add('production-workspace-open');
+        document.getElementById('production-create-panel')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     });
 
     panelCloseBtn?.addEventListener('click', () => {
@@ -815,4 +915,397 @@ if (productionWorkspace) {
         document.getElementById('production-form')?.dispatchEvent(new CustomEvent('production:reset-create'));
         productionWorkspace.classList.remove('production-workspace-open');
     });
+}
+
+
+// Multi-Item Supplier Purchase Order Form Management
+const purchaseOrderForm = document.getElementById('purchase-order-form');
+if (purchaseOrderForm) {
+    const linesList = document.getElementById('purchase-lines');
+    const lineTemplate = document.getElementById('purchase-lines-template');
+    const supplierSelect = purchaseOrderForm.querySelector('[data-purchase-supplier]');
+    const vatInput = purchaseOrderForm.querySelector('[data-purchase-vat]');
+    const itemCountBadge = purchaseOrderForm.querySelector('[data-purchase-item-count]');
+    const addSupplierItemsBtn = purchaseOrderForm.querySelector('[data-add-supplier-items]');
+    const summaryItemsEl = purchaseOrderForm.querySelector('[data-summary-items]');
+    const summarySubtotalEl = purchaseOrderForm.querySelector('[data-summary-subtotal]');
+    const summaryVatRateEl = purchaseOrderForm.querySelector('[data-summary-vat-rate]');
+    const summaryVatEl = purchaseOrderForm.querySelector('[data-summary-vat]');
+    const summaryTotalEl = purchaseOrderForm.querySelector('[data-summary-total]');
+    const currencySymbol = purchaseOrderForm.dataset.currencySymbol || '$';
+    const currencyCode = purchaseOrderForm.dataset.currencyCode || 'USD';
+
+    const syncRowMaterialDetails = (row, autoFillCost = false) => {
+        if (!row) return;
+        const matSelect = row.querySelector('[data-purchase-material]');
+        const unitPill = row.querySelector('[data-purchase-unit]');
+        const costInput = row.querySelector('[data-purchase-cost]');
+        if (!(matSelect instanceof HTMLSelectElement)) return;
+
+        const selectedOpt = matSelect.selectedOptions?.[0];
+        const unit = selectedOpt?.dataset?.unit || '';
+        const defaultCost = selectedOpt?.dataset?.cost || '';
+
+        if (unitPill) {
+            unitPill.textContent = unit ? `(${unit})` : '';
+        }
+        if (autoFillCost && costInput instanceof HTMLInputElement && (!costInput.value || Number(costInput.value) === 0) && defaultCost !== '') {
+            costInput.value = Number(defaultCost).toFixed(2);
+        }
+    };
+
+    const syncSupplierMaterials = () => {
+        const selectedSupplierId = supplierSelect?.value || '';
+        let supplierMatchCount = 0;
+
+        const sampleSelect = linesList?.querySelector('[data-purchase-material]') || lineTemplate?.content?.querySelector('[data-purchase-material]');
+        if (sampleSelect) {
+            [...sampleSelect.options].forEach((opt) => {
+                if (opt.value && selectedSupplierId && String(opt.dataset.supplierId) === String(selectedSupplierId)) {
+                    supplierMatchCount++;
+                }
+            });
+        }
+
+        if (addSupplierItemsBtn) {
+            addSupplierItemsBtn.hidden = !(selectedSupplierId && supplierMatchCount > 0);
+        }
+
+        linesList?.querySelectorAll('[data-purchase-material]').forEach((select) => {
+            [...select.options].forEach((opt) => {
+                if (!opt.value) return;
+                const baseLabel = opt.dataset.baseLabel || opt.textContent.replace(/^★\s*/, '').trim();
+                const isPreferred = selectedSupplierId && String(opt.dataset.supplierId) === String(selectedSupplierId);
+                opt.textContent = isPreferred ? `★ ${baseLabel}` : baseLabel;
+            });
+        });
+    };
+
+    const recalculatePurchaseOrder = () => {
+        if (!linesList) return;
+        const rows = [...linesList.querySelectorAll('[data-line-row]')];
+        const count = rows.length;
+        let totalQty = 0;
+        let subtotal = 0;
+
+        rows.forEach((row, idx) => {
+            const badge = row.querySelector('[data-line-index]');
+            if (badge) badge.textContent = `#${idx + 1}`;
+
+            syncRowMaterialDetails(row, false);
+
+            const qtyInput = row.querySelector('[data-purchase-qty]');
+            const costInput = row.querySelector('[data-purchase-cost]');
+            const lineTotalEl = row.querySelector('[data-purchase-line-total]');
+
+            const qty = parseFloat(qtyInput?.value || '0') || 0;
+            const cost = parseFloat(costInput?.value || '0') || 0;
+            const lineTotal = qty * cost;
+
+            totalQty += qty;
+            subtotal += lineTotal;
+
+            if (lineTotalEl) {
+                lineTotalEl.textContent = `${currencySymbol}${lineTotal.toFixed(2)}`;
+            }
+        });
+
+        const vatRate = parseFloat(vatInput?.value || '0') || 0;
+        const vatAmount = subtotal * (vatRate / 100);
+        const grandTotal = subtotal + vatAmount;
+
+        if (itemCountBadge) {
+            itemCountBadge.textContent = `${count} ${count === 1 ? 'item' : 'items'}`;
+        }
+        if (summaryItemsEl) {
+            summaryItemsEl.textContent = `${count} ${count === 1 ? 'item' : 'items'} · ${totalQty.toFixed(2)} total qty`;
+        }
+        if (summarySubtotalEl) {
+            summarySubtotalEl.textContent = `${currencySymbol}${subtotal.toFixed(2)}`;
+        }
+        if (summaryVatRateEl) {
+            summaryVatRateEl.textContent = vatRate.toFixed(2);
+        }
+        if (summaryVatEl) {
+            summaryVatEl.textContent = `${currencySymbol}${vatAmount.toFixed(2)}`;
+        }
+        if (summaryTotalEl) {
+            summaryTotalEl.textContent = `${currencySymbol}${grandTotal.toFixed(2)} ${currencyCode}`;
+        }
+    };
+
+    purchaseOrderForm.addEventListener('purchase:lines-changed', (e) => {
+        if (e.detail?.addedRow) {
+            syncSupplierMaterials();
+            syncRowMaterialDetails(e.detail.addedRow, false);
+        }
+        recalculatePurchaseOrder();
+    });
+
+    purchaseOrderForm.addEventListener('change', (e) => {
+        if (e.target.matches('[data-purchase-supplier]')) {
+            syncSupplierMaterials();
+            return;
+        }
+        if (e.target.matches('[data-purchase-material]')) {
+            const row = e.target.closest('[data-line-row]');
+            syncRowMaterialDetails(row, true);
+            recalculatePurchaseOrder();
+            return;
+        }
+        if (e.target.matches('[data-purchase-qty], [data-purchase-cost], [data-purchase-vat]')) {
+            recalculatePurchaseOrder();
+        }
+    });
+
+    purchaseOrderForm.addEventListener('input', (e) => {
+        if (e.target.matches('[data-purchase-qty], [data-purchase-cost], [data-purchase-vat]')) {
+            recalculatePurchaseOrder();
+        }
+    });
+
+    addSupplierItemsBtn?.addEventListener('click', () => {
+        const selectedSupplierId = supplierSelect?.value || '';
+        if (!selectedSupplierId || !linesList || !lineTemplate) return;
+
+        const templateSelect = lineTemplate.content.querySelector('[data-purchase-material]');
+        if (!templateSelect) return;
+
+        const supplierMaterialOptions = [...templateSelect.options].filter(
+            (opt) => opt.value && String(opt.dataset.supplierId) === String(selectedSupplierId)
+        );
+        if (supplierMaterialOptions.length === 0) return;
+
+        const existingMaterialIds = new Set(
+            [...linesList.querySelectorAll('[data-purchase-material]')]
+                .map((sel) => String(sel.value))
+                .filter(Boolean)
+        );
+
+        supplierMaterialOptions.forEach((opt) => {
+            if (existingMaterialIds.has(String(opt.value))) return;
+
+            // Check if the first row is currently blank and reuse it
+            const emptyRow = [...linesList.querySelectorAll('[data-line-row]')].find((r) => {
+                const sel = r.querySelector('[data-purchase-material]');
+                return sel && !sel.value;
+            });
+
+            if (emptyRow) {
+                const sel = emptyRow.querySelector('[data-purchase-material]');
+                if (sel) sel.value = opt.value;
+                syncRowMaterialDetails(emptyRow, true);
+                existingMaterialIds.add(String(opt.value));
+            } else {
+                const indexes = [...linesList.querySelectorAll('[name]')]
+                    .map((field) => Number(field.name.match(/\[(\d+)\]/)?.[1] ?? -1));
+                const nextIndex = Math.max(-1, ...indexes) + 1;
+                const newRow = lineTemplate.content.firstElementChild.cloneNode(true);
+                newRow.querySelectorAll('[data-name]').forEach((field) => {
+                    field.name = `items[${nextIndex}][${field.dataset.name}]`;
+                    field.removeAttribute('data-name');
+                });
+                const sel = newRow.querySelector('[data-purchase-material]');
+                if (sel) sel.value = opt.value;
+                linesList.append(newRow);
+                syncRowMaterialDetails(newRow, true);
+                existingMaterialIds.add(String(opt.value));
+            }
+        });
+
+        syncSupplierMaterials();
+        recalculatePurchaseOrder();
+    });
+
+    syncSupplierMaterials();
+    recalculatePurchaseOrder();
+}
+
+
+// Record Production Drawer in Finished Goods & Semi Finished Goods Modules
+const recordProdDrawer = document.getElementById('record-production-drawer');
+if (recordProdDrawer) {
+    const backdrop = document.getElementById('record-production-backdrop');
+    const productSelect = recordProdDrawer.querySelector('[data-record-product-select]');
+    const qtyInput = recordProdDrawer.querySelector('[data-record-qty-input]');
+    const locationSelect = recordProdDrawer.querySelector('[data-record-location-select]');
+    const unitSuffix = document.getElementById('record-unit-suffix');
+    const categoryPill = document.getElementById('record-prod-category-pill');
+    const scaleBadge = document.getElementById('record-recipe-scale-badge');
+    const recipeEmpty = document.getElementById('record-recipe-empty');
+    const recipeList = document.getElementById('record-recipe-list');
+
+    let productsMap = {};
+    try {
+        productsMap = JSON.parse(recordProdDrawer.dataset.productsMap || '{}');
+    } catch (e) {
+        productsMap = {};
+    }
+
+    const escapeHtml = (str) => String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+    const syncRecordProductionRecipe = (resetCustomQuantities = true) => {
+        const selectedId = productSelect?.value || '';
+        const product = productsMap[selectedId] || null;
+        const qty = Math.max(0, parseFloat(qtyInput?.value || '0') || 0);
+
+        if (!product) {
+            if (unitSuffix) unitSuffix.textContent = 'Units';
+            if (categoryPill) categoryPill.hidden = true;
+            if (scaleBadge) scaleBadge.textContent = `× ${qty.toFixed(2)} units`;
+            if (recipeEmpty) {
+                recipeEmpty.hidden = false;
+                recipeEmpty.innerHTML = 'Select a predefined product above to load its 1-unit formulation recipe and check raw material stock availability.';
+            }
+            if (recipeList) {
+                recipeList.hidden = true;
+                recipeList.innerHTML = '';
+            }
+            return;
+        }
+
+        if (unitSuffix) unitSuffix.textContent = product.unit || 'Units';
+        if (categoryPill) {
+            categoryPill.textContent = product.category || 'Uncategorized';
+            categoryPill.hidden = false;
+        }
+        if (scaleBadge) {
+            scaleBadge.textContent = `× ${qty.toFixed(2)} ${product.unit || 'units'}`;
+        }
+        if (resetCustomQuantities && locationSelect && product.location && !locationSelect.value) {
+            locationSelect.value = product.location;
+        }
+
+        const recipes = Array.isArray(product.recipes) ? product.recipes : [];
+        if (recipes.length === 0) {
+            if (recipeEmpty) {
+                recipeEmpty.hidden = false;
+                recipeEmpty.innerHTML = `No raw material ingredients are pre-defined for <strong>${escapeHtml(product.name)}</strong>. Production will record the output batch directly.`;
+            }
+            if (recipeList) {
+                recipeList.hidden = true;
+                recipeList.innerHTML = '';
+            }
+            return;
+        }
+
+        if (recipeEmpty) recipeEmpty.hidden = true;
+        if (recipeList) {
+            recipeList.hidden = false;
+            recipeList.innerHTML = recipes.map((ing, idx) => {
+                const reqQty = Number((ing.per_unit_qty || 0) * (qty || 0));
+                const avail = Number(ing.available_stock || 0);
+                const sufficient = avail + 0.0001 >= reqQty;
+                return `
+                    <div class="record-recipe-row ${sufficient ? 'is-sufficient' : 'is-short'}" data-record-ing-row>
+                        <input type="hidden" name="ingredients[${idx}][material_id]" value="${ing.material_id}">
+                        <div class="record-recipe-info">
+                            <strong>${escapeHtml(ing.name)}</strong>
+                            <small>${ing.code ? escapeHtml(ing.code) + ' · ' : ''}1-unit recipe: ${Number(ing.per_unit_qty).toFixed(2)} ${escapeHtml(ing.unit)}</small>
+                        </div>
+                        <div class="record-recipe-Availability">
+                            <span class="record-stock-pill ${sufficient ? 'stock-ok' : 'stock-low'}" data-ing-avail="${avail}" data-ing-unit="${escapeHtml(ing.unit)}">
+                                ${sufficient ? '✓' : '⚠'} Stock: ${avail.toFixed(2)} ${escapeHtml(ing.unit)}
+                            </span>
+                        </div>
+                        <div class="record-recipe-qty-wrap">
+                            <input type="number"
+                                   name="ingredients[${idx}][quantity]"
+                                   step="0.01"
+                                   min="0.01"
+                                   value="${reqQty.toFixed(2)}"
+                                   data-per-unit="${ing.per_unit_qty}"
+                                   data-record-ing-qty
+                                   required>
+                            <span class="record-ing-unit">${escapeHtml(ing.unit)}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    };
+
+    const openRecordDrawer = (productId = '') => {
+        if (productId && productSelect) {
+            productSelect.value = String(productId);
+            if (qtyInput && (!qtyInput.value || Number(qtyInput.value) <= 0)) {
+                qtyInput.value = '1.00';
+            }
+        }
+        syncRecordProductionRecipe(true);
+        recordProdDrawer.classList.add('is-open');
+        backdrop?.classList.add('is-open');
+        productSelect?.focus();
+    };
+
+    const closeRecordDrawer = () => {
+        recordProdDrawer.classList.remove('is-open');
+        backdrop?.classList.remove('is-open');
+    };
+
+    document.addEventListener('click', (e) => {
+        const openBtn = e.target.closest('[data-open-record-production]');
+        if (openBtn) {
+            e.preventDefault();
+            openRecordDrawer('');
+            return;
+        }
+
+        const rowProduceBtn = e.target.closest('[data-produce-product-id]');
+        if (rowProduceBtn) {
+            e.preventDefault();
+            openRecordDrawer(rowProduceBtn.dataset.produceProductId || '');
+            return;
+        }
+
+        const closeBtn = e.target.closest('[data-close-record-production]');
+        if (closeBtn) {
+            e.preventDefault();
+            closeRecordDrawer();
+        }
+    });
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && recordProdDrawer.classList.contains('is-open')) {
+            closeRecordDrawer();
+        }
+    });
+
+    productSelect?.addEventListener('change', () => {
+        syncRecordProductionRecipe(true);
+    });
+
+    qtyInput?.addEventListener('input', () => {
+        const qty = Math.max(0, parseFloat(qtyInput.value || '0') || 0);
+        const selectedId = productSelect?.value || '';
+        const product = productsMap[selectedId] || null;
+        if (scaleBadge) {
+            scaleBadge.textContent = `× ${qty.toFixed(2)} ${product?.unit || 'units'}`;
+        }
+        recipeList?.querySelectorAll('[data-record-ing-row]').forEach((row) => {
+            const ingInput = row.querySelector('[data-record-ing-qty]');
+            const stockPill = row.querySelector('[data-ing-avail]');
+            if (ingInput instanceof HTMLInputElement) {
+                const perUnit = parseFloat(ingInput.dataset.perUnit || '0') || 0;
+                const reqQty = perUnit * qty;
+                ingInput.value = reqQty.toFixed(2);
+                if (stockPill) {
+                    const avail = parseFloat(stockPill.dataset.ingAvail || '0') || 0;
+                    const unit = stockPill.dataset.ingUnit || '';
+                    const sufficient = avail + 0.0001 >= reqQty;
+                    row.classList.toggle('is-sufficient', sufficient);
+                    row.classList.toggle('is-short', !sufficient);
+                    stockPill.classList.toggle('stock-ok', sufficient);
+                    stockPill.classList.toggle('stock-low', !sufficient);
+                    stockPill.textContent = `${sufficient ? '✓' : '⚠'} Stock: ${avail.toFixed(2)} ${unit}`;
+                }
+            }
+        });
+    });
+
+    syncRecordProductionRecipe(false);
 }

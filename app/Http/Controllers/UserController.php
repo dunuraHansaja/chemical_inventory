@@ -157,6 +157,33 @@ class UserController extends Controller
             ->with('success', 'Your profile details were updated successfully.');
     }
 
+    public function destroy(Request $request, User $user): RedirectResponse
+    {
+        if ($request->user()->is($user)) {
+            return back()->withErrors(['user' => 'You cannot delete your own account.']);
+        }
+
+        if ($user->is_active && $user->role?->is_system) {
+            $activeAdmins = User::query()->where('is_active', true)
+                ->whereHas('role', fn ($query) => $query->where('is_system', true))
+                ->count();
+
+            if ($activeAdmins <= 1) {
+                return back()->withErrors(['user' => 'At least one active administrator account must remain.']);
+            }
+        }
+
+        $name = $user->name;
+        if ($user->avatar_path && Storage::disk('public')->exists($user->avatar_path)) {
+            Storage::disk('public')->delete($user->avatar_path);
+        }
+        $user->delete();
+
+        return redirect()->route('settings.users.index')
+            ->with('warning_title', 'User Account Deleted')
+            ->with('warning', "The user account “{$name}” was deleted.");
+    }
+
     private function validated(Request $request, ?User $user = null): array
     {
         return $request->validate([

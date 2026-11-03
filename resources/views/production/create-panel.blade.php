@@ -41,125 +41,80 @@
             @error('new_product_category')<small class="production-field-error">{{ $message }}</small>@enderror
         </div>
 
-        <!-- Production Name -->
+        <!-- Product Name -->
         <div class="production-field-block" data-production-name-group>
             <div class="production-field-header">
-                <label class="production-label" for="product-made-select">PRODUCTION NAME</label>
-                <button type="button" class="production-toggle-category-btn" data-toggle-new-product>
-                    <span data-toggle-product-label>{{ old('new_production_name') ? '← Select existing' : '＋ New product' }}</span>
-                </button>
+                <label class="production-label" for="new-product-input">PRODUCT NAME</label>
             </div>
-            <div class="production-input-icon-wrap" data-product-select-wrap style="{{ old('new_production_name') ? 'display:none;' : '' }}">
-                <span class="production-field-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>
-                        <path d="M8 15h8"/>
-                    </svg>
-                </span>
-                <select id="product-made-select" name="product_id" data-product-select>
-                    <option value="">Select a product</option>
-                    @foreach($materials as $material)
-                        <option value="{{ $material->id }}"
-                                data-category-id="{{ $material->product_category_id }}"
-                                data-unit="{{ $material->stock_unit }}"
-                                data-code="{{ $material->item_code }}"
-                                @selected(old('product_id') == $material->id)>
-                            {{ $material->name }} ({{ $material->item_code }})
-                        </option>
-                    @endforeach
-                    <option value="__new__">＋ Type new product name...</option>
-                </select>
-                <svg class="production-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
-            </div>
-            <div class="production-input-icon-wrap" data-new-product-wrap style="{{ old('new_production_name') ? '' : 'display:none;' }}">
-                <span class="production-field-icon" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>
-                        <path d="M8 15h8"/>
-                    </svg>
-                </span>
-                <input id="new-product-input" type="text" name="new_production_name" value="{{ old('new_production_name') }}" placeholder="Type new production name (e.g. Hand Sanitizer, Hand Wash)">
-            </div>
-            @error('product_id')<small class="production-field-error">{{ $message }}</small>@enderror
-            @error('new_production_name')<small class="production-field-error">{{ $message }}</small>@enderror
-        </div>
-
-        <!-- Units & Production Batch (2-Column Grid) -->
-        <div class="production-grid-2">
-            <div class="production-field-block">
-                <label class="production-label" for="quantity-made-input">
-                    UNITS <span class="production-unit-pill" data-quantity-unit-tag hidden></span>
-                </label>
-                <div class="production-input-icon-wrap">
-                    <span class="production-field-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M12 3 21 8v8l-9 5-9-5V8l9-5Z"/>
-                            <path d="m3 8 9 5 9-5M12 13v8"/>
-                        </svg>
-                    </span>
-                    <input id="quantity-made-input" type="number" name="quantity" min="0.001" step="0.001" value="{{ old('quantity') }}" placeholder="Enter units" required>
-                </div>
-                @error('quantity')<small class="production-field-error">{{ $message }}</small>@enderror
-            </div>
-
-            <div class="production-field-block">
-                <label class="production-label" for="batch-no-input">PRODUCTION BATCH</label>
-                <div class="production-input-icon-wrap">
-                    <span class="production-field-icon" aria-hidden="true">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="m20.6 13.4-7.2 7.2a2 2 0 0 1-2.8 0l-7.2-7.2a2 2 0 0 1 0-2.8l7.2-7.2A2 2 0 0 1 12.8 3h7a2 2 0 0 1 2 2v7a2 2 0 0 1-1.2 1.4Z"/>
-                            <circle cx="16.5" cy="7.5" r="1"/>
-                        </svg>
-                    </span>
-                    <input id="batch-no-input" type="text" name="batch_number" value="{{ old('batch_number', $defaultBatchNo) }}" placeholder="{{ $defaultBatchNo }}">
-                </div>
-                @error('batch_number')<small class="production-field-error">{{ $message }}</small>@enderror
-            </div>
-        </div>
-
-        <!-- Expiry Date -->
-        <div class="production-field-block">
-            <label class="production-label" for="expiry-date-input">EXPIRY DATE</label>
             <div class="production-input-icon-wrap">
                 <span class="production-field-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
-                        <line x1="16" y1="2" x2="16" y2="6"/>
-                        <line x1="8" y1="2" x2="8" y2="6"/>
-                        <line x1="3" y1="10" x2="21" y2="10"/>
+                        <path d="M9 3h6M10 3v6l-5 9a2 2 0 0 0 1.8 3h10.4a2 2 0 0 0 1.8-3l-5-9V3"/>
+                        <path d="M8 15h8"/>
                     </svg>
                 </span>
-                <input id="expiry-date-input" type="date" name="expiry_date" value="{{ old('expiry_date') }}" placeholder="mm/dd/yyyy">
+                <input id="new-product-input" type="text" name="new_production_name" value="{{ old('new_production_name') }}" placeholder="Enter new product name" required>
             </div>
-            @error('expiry_date')<small class="production-field-error">{{ $message }}</small>@enderror
+            <select id="product-made-select" name="product_id" data-product-select style="display:none;" aria-hidden="true" tabindex="-1">
+                <option value="">Select a product</option>
+                @foreach($materials as $material)
+                    <option value="{{ $material->id }}"
+                            data-category-id="{{ $material->product_category_id }}"
+                            data-unit="{{ $material->stock_unit }}"
+                            data-code="{{ $material->item_code }}"
+                            @selected(old('product_id') == $material->id)>
+                        {{ $material->name }} ({{ $material->item_code }})
+                    </option>
+                @endforeach
+            </select>
+            @error('new_production_name')<small class="production-field-error">{{ $message }}</small>@enderror
+            @error('product_id')<small class="production-field-error">{{ $message }}</small>@enderror
         </div>
 
-        <!-- Note -->
+        <!-- Product Classification (Finished Good or Semi Finished Good) -->
+        <div class="production-field-block" data-goods-type-group>
+            <label class="production-label">PRODUCT CLASSIFICATION</label>
+            <div class="production-type-checkboxes">
+                <label class="production-type-checkbox-card" for="type-finished-good">
+                    <input type="checkbox" name="goods_type" value="finished_good" id="type-finished-good" checked>
+                    <span>Finished Good</span>
+                </label>
+                <label class="production-type-checkbox-card" for="type-semi-finished-good">
+                    <input type="checkbox" name="goods_type" value="semi_finished_good" id="type-semi-finished-good">
+                    <span>Semi Finished Good</span>
+                </label>
+            </div>
+        </div>
+
+        <!-- Units (1 Unit Recipe) -->
         <div class="production-field-block">
-            <label class="production-label" for="note-input">NOTE</label>
-            <div class="production-textarea-icon-wrap">
+            <label class="production-label" for="quantity-made-input">
+                UNITS (1 UNIT RECIPE)
+            </label>
+            <div class="production-input-icon-wrap" style="background: #f8fafc;">
                 <span class="production-field-icon" aria-hidden="true">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                        <path d="M12 3 21 8v8l-9 5-9-5V8l9-5Z"/>
+                        <path d="m3 8 9 5 9-5M12 13v8"/>
                     </svg>
                 </span>
-                <textarea id="note-input" name="notes" rows="2" placeholder="Enter any note...">{{ old('notes') }}</textarea>
+                <input id="quantity-made-input" type="number" name="quantity" min="1" max="1" step="1" value="1" readonly required style="cursor: default;">
             </div>
-            @error('notes')<small class="production-field-error">{{ $message }}</small>@enderror
+            <small class="production-field-hint" style="color: #64748b; font-size: 0.8rem; margin-top: 6px; display: block;">Formulation recipe is defined for 1 unit of product.</small>
+            @error('quantity')<small class="production-field-error">{{ $message }}</small>@enderror
         </div>
     </div>
 
-    <!-- Ingredients Used Section -->
+    <!-- Formulation Recipe (Ingredients) Section -->
     <div class="production-ingredients-section" aria-labelledby="production-ingredients-title">
         <div class="ingredients-header-block">
-            <h3 id="production-ingredients-title">INGREDIENTS USED</h3>
-            <p class="ingredients-helper-text">Ingredients are consumed earliest expiry first. Expired lots are skipped.</p>
+            <h3 id="production-ingredients-title">FORMULATION RECIPE (INGREDIENTS)</h3>
+            <p class="ingredients-helper-text">Select raw materials/packagings and their required quantities for <strong>1 unit</strong> of this product.</p>
         </div>
 
         <div class="ingredients-table-header">
             <span class="col-material">Material / Ingredient</span>
-            <span class="col-qty">Quantity</span>
+            <span class="col-qty">Quantity (for 1 unit)</span>
             <span class="col-unit">Unit</span>
             <span class="col-actions">Actions</span>
         </div>
@@ -177,7 +132,7 @@
                     <line x1="12" y1="8" x2="12" y2="12"/>
                     <line x1="12" y1="16" x2="12.01" y2="16"/>
                 </svg>
-                <span>No materials added yet. Click <strong>+ Add ingredient</strong> below to select materials.</span>
+                <span>No materials added yet. Click <strong>+ Add ingredient</strong> below to select materials for 1 unit.</span>
             </div>
 
             @foreach($initialIngredients as $idx => $line)
@@ -201,7 +156,7 @@
 
                     <!-- Quantity input -->
                     <div class="ingredient-qty-cell">
-                        <input type="number" name="ingredients[{{ $idx }}][quantity]" min="0.001" step="0.001" value="{{ $line['quantity'] ?? '' }}" placeholder="Qty" required data-ingredient-qty>
+                        <input type="number" name="ingredients[{{ $idx }}][quantity]" min="0.01" step="0.01" value="{{ isset($line['quantity']) && $line['quantity'] !== '' ? number_format((float) $line['quantity'], 2, '.', '') : '' }}" placeholder="0.00" required data-ingredient-qty>
                     </div>
 
                     <!-- Unit select -->
@@ -236,14 +191,14 @@
         </button>
     </div>
 
-    <!-- Immediate notice banner -->
+    <!-- Formulation Recipe Info Banner -->
     <div class="production-notice-pill">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <circle cx="12" cy="12" r="10"/>
             <line x1="12" y1="16" x2="12" y2="12"/>
             <line x1="12" y1="8" x2="12.01" y2="8"/>
         </svg>
-        <span><strong>Stock changes are immediate.</strong> Saving consumes ingredient stock and creates a traceable product batch.</span>
+        <span><strong>Formulation Recipe (Per 1 Unit):</strong> Saving pre-defines the raw materials and quantities required to produce 1 unit of this product.</span>
     </div>
     </div>
 
@@ -256,7 +211,7 @@
                 <polyline points="17 21 17 13 7 13 7 21"/>
                 <polyline points="7 3 7 8 15 8"/>
             </svg>
-            <span id="production-submit-label">Record production</span>
+            <span id="production-submit-label">Save Product &amp; Recipe</span>
         </button>
     </div>
 </form>
@@ -279,7 +234,7 @@
             <svg class="production-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>
         </div>
         <div class="ingredient-qty-cell">
-            <input type="number" data-name="quantity" min="0.001" step="0.001" placeholder="Qty" required data-ingredient-qty>
+            <input type="number" data-name="quantity" min="0.01" step="0.01" placeholder="0.00" required data-ingredient-qty>
         </div>
         <div class="ingredient-unit-cell">
             <select data-name="unit" class="ingredient-unit-select" data-ingredient-unit>

@@ -79,6 +79,88 @@ class InventoryWorkflowTest extends TestCase
 
         $this->assertDatabaseHas('materials', ['id' => $material->id, 'name' => 'Ethanol 96%']);
     }
+    public function test_material_and_packaging_can_be_created_with_initial_purchase_quantity(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $category = Category::create(['name' => 'Acids', 'is_active' => true]);
+        $supplier = Supplier::create(['supplier_code' => 'SUP-INIT', 'name' => 'Global Chemical Co', 'is_active' => true]);
+
+        // Form renders initial purchase quantity field
+        $this->get('/materials/create')
+            ->assertOk()
+            ->assertSee('Initial purchase quantity')
+            ->assertSee('name="initial_purchase_quantity"', false);
+
+        // 1. Create Raw Material with initial purchase quantity
+        $this->post('/materials', [
+            'type' => 'material',
+            'item_code' => 'HCL-001',
+            'name' => 'Hydrochloric Acid 37%',
+            'category_id' => $category->id,
+            'preferred_supplier_id' => $supplier->id,
+            'stock_unit' => 'L',
+            'initial_purchase_quantity' => 75.50,
+            'reorder_level' => 20.00,
+            'cost_per_unit' => 12.00,
+            'storage_location' => 'Acid Bay A',
+            'is_active' => '1',
+        ])->assertRedirect();
+
+        $rawMaterial = Material::where('item_code', 'HCL-001')->firstOrFail();
+        $this->assertDatabaseHas('material_lots', [
+            'material_id' => $rawMaterial->id,
+            'quantity_on_hand' => 75.50,
+            'quantity_received' => 75.50,
+            'storage_location' => 'Acid Bay A',
+        ]);
+        $this->assertDatabaseHas('stock_movements', [
+            'material_id' => $rawMaterial->id,
+            'movement_type' => 'purchase_receipt',
+            'quantity' => 75.50,
+            'balance_after' => 75.50,
+        ]);
+
+        $this->get('/materials/'.$rawMaterial->id)
+            ->assertOk()
+            ->assertSee('75.50');
+
+        // 2. Create Packaging / Can with initial purchase quantity
+        $this->post('/materials', [
+            'type' => 'product',
+            'packaging_type' => 'Bottle',
+            'item_code' => 'BTL-500',
+            'name' => '500ml Amber Glass Bottle',
+            'stock_unit' => 'units',
+            'initial_purchase_quantity' => 300.00,
+            'reorder_level' => 50.00,
+            'cost_per_unit' => 1.25,
+            'storage_location' => 'Packaging Rack 1',
+            'is_active' => '1',
+        ])->assertRedirect();
+
+        $packaging = Material::where('item_code', 'BTL-500')->firstOrFail();
+        $this->assertEquals('Bottle', $packaging->packaging_type);
+        $this->assertDatabaseHas('material_lots', [
+            'material_id' => $packaging->id,
+            'quantity_on_hand' => 300.00,
+            'quantity_received' => 300.00,
+            'storage_location' => 'Packaging Rack 1',
+        ]);
+        $this->assertDatabaseHas('stock_movements', [
+            'material_id' => $packaging->id,
+            'movement_type' => 'purchase_receipt',
+            'quantity' => 300.00,
+            'balance_after' => 300.00,
+        ]);
+
+        $this->get('/materials?type=product')
+            ->assertOk()
+            ->assertSee('500ml Amber Glass Bottle')
+            ->assertSee('300.00');
+    }
+
 
     public function test_all_inventory_screens_render_for_an_authenticated_user(): void
     {
@@ -88,10 +170,14 @@ class InventoryWorkflowTest extends TestCase
             '/dashboard',
             '/materials',
             '/materials/create',
+            '/finished-goods',
+            '/semi-finished-goods',
             '/suppliers',
             '/suppliers/create',
             '/categories',
             '/categories/create',
+            '/storage-locations',
+            '/storage-locations/create',
             '/lots',
             '/lots/create',
             '/stock/adjustments/create',
@@ -158,6 +244,12 @@ class InventoryWorkflowTest extends TestCase
             ->assertSee('Finished product')
             ->assertSee('PB-TEST-100')
             ->assertSee('Expires '.today()->addYear()->toDateString());
+
+        // Ensure raw material ingredients are not rendered as product cards
+        $this->get('/production')
+            ->assertOk()
+            ->assertSee('Finished product')
+            ->assertDontSee('data-product-code="RAW-100"', false);
 
         $this->get('/production?category_id='.$category->id.'&q=missing')
             ->assertOk()
@@ -274,12 +366,18 @@ class InventoryWorkflowTest extends TestCase
             ->assertSee('PB-2026-0099')
             ->assertSee('ING-WAX', false);
 
-        // Submit edit request
+        // Verify product initially appears in Finished Goods module and shows Finished Good in overview
+        $this->get('/production')->assertOk()->assertSee('Finished Good');
+        $this->get('/finished-goods')->assertOk()->assertSee('Premium Car Wax')->assertDontSee('/materials/'.$ingredient->id);
+        $this->get('/semi-finished-goods')->assertOk()->assertDontSee('Premium Car Wax');
+
+        // Submit edit request changing classification to Semi Finished Good
         $this->post('/production', [
             'editing_product_id' => $product->id,
             'category_id' => $category->id,
             'product_id' => $product->id,
             'new_production_name' => 'Ultra Car Wax Deluxe',
+            'goods_type' => 'semi_finished_good',
             'quantity' => 65,
             'batch_number' => 'PB-2026-0100',
             'expiry_date' => today()->addYears(2)->toDateString(),
@@ -288,8 +386,12 @@ class InventoryWorkflowTest extends TestCase
             ],
         ])->assertRedirect('/production');
 
-        // Material name updated
+        // Material name and classification updated, and reflected in overview & Semi Finished Goods module
         $this->assertEquals('Ultra Car Wax Deluxe', $product->fresh()->name);
+        $this->assertEquals('semi_finished_good', $product->fresh()->type);
+        $this->get('/production')->assertOk()->assertSee('Semi Finished Good');
+        $this->get('/semi-finished-goods')->assertOk()->assertSee('Ultra Car Wax Deluxe')->assertDontSee('/materials/'.$ingredient->id);
+        $this->get('/finished-goods')->assertOk()->assertDontSee('Ultra Car Wax Deluxe');
 
         // Recipe updated
         $this->assertDatabaseHas('product_recipes', [
@@ -303,6 +405,94 @@ class InventoryWorkflowTest extends TestCase
             'material_id' => $product->id,
             'lot_number' => 'PB-2026-0100',
             'quantity_on_hand' => 65,
+        ]);
+
+        // Also verify editing a product that has no existing lot and without sending notes/batch_number/expiry_date
+        $lotlessProduct = Material::create([
+            'item_code' => 'FG-223',
+            'name' => 'Gluteraldehyde',
+            'product_category_id' => $category->id,
+            'stock_unit' => 'Kg',
+            'reorder_level' => 0,
+            'is_active' => true,
+        ]);
+
+        $this->post('/production', [
+            'editing_product_id' => $lotlessProduct->id,
+            'category_id' => $category->id,
+            'product_id' => $lotlessProduct->id,
+            'new_production_name' => 'Gluteraldehyde',
+            'goods_type' => 'semi_finished_good',
+            'quantity' => 1,
+        ])->assertRedirect('/production');
+
+        $this->assertEquals('semi_finished_good', $lotlessProduct->fresh()->type);
+
+        // Verify Record Production in Semi Finished Goods and Finished Goods scales 1-unit recipe and updates stock
+        MaterialLot::create([
+            'material_id' => $ingredient->id,
+            'lot_number' => 'RAW-WAX-LOT',
+            'quantity_received' => 100,
+            'quantity_on_hand' => 100,
+            'expiry_date' => today()->addMonths(6),
+            'status' => 'active',
+        ]);
+
+        // Produce 2 units of Semi Finished Good ($product has recipe requiring 15 kg of $ingredient per 1 unit => 30 kg consumed)
+        $this->post('/semi-finished-goods/produce', [
+            'product_id' => $product->id,
+            'quantity' => 2,
+            'batch_number' => 'SFG-BATCH-001',
+            'expiry_date' => today()->addYear()->toDateString(),
+            'notes' => 'Produced in SFG module',
+        ])->assertRedirect('/semi-finished-goods')
+            ->assertSessionHas('success_title', 'Production Recorded');
+
+        $this->assertDatabaseHas('material_lots', [
+            'material_id' => $product->id,
+            'lot_number' => 'SFG-BATCH-001',
+            'quantity_on_hand' => 2,
+        ]);
+        $this->assertDatabaseHas('material_lots', [
+            'material_id' => $ingredient->id,
+            'lot_number' => 'RAW-WAX-LOT',
+            'quantity_on_hand' => 70,
+        ]);
+
+        // Also test Finished Goods Record Production
+        $fgProduct = Material::create([
+            'item_code' => 'FG-900',
+            'name' => 'Finished Polish',
+            'type' => 'finished_good',
+            'product_category_id' => $category->id,
+            'stock_unit' => 'L',
+            'reorder_level' => 5,
+            'is_active' => true,
+        ]);
+        \App\Models\ProductRecipe::create([
+            'product_id' => $fgProduct->id,
+            'material_id' => $ingredient->id,
+            'quantity' => 5,
+            'unit' => 'kg',
+        ]);
+
+        $this->post('/finished-goods/produce', [
+            'product_id' => $fgProduct->id,
+            'quantity' => 4,
+            'batch_number' => 'FG-BATCH-001',
+            'expiry_date' => today()->addYear()->toDateString(),
+        ])->assertRedirect('/finished-goods')
+            ->assertSessionHas('success_title', 'Production Recorded');
+
+        $this->assertDatabaseHas('material_lots', [
+            'material_id' => $fgProduct->id,
+            'lot_number' => 'FG-BATCH-001',
+            'quantity_on_hand' => 4,
+        ]);
+        $this->assertDatabaseHas('material_lots', [
+            'material_id' => $ingredient->id,
+            'lot_number' => 'RAW-WAX-LOT',
+            'quantity_on_hand' => 50,
         ]);
     }
 
@@ -370,6 +560,49 @@ class InventoryWorkflowTest extends TestCase
             ->assertRedirect('/categories')
             ->assertSessionHas('warning', 'The category “Updated category” was deleted.');
         $this->assertDatabaseMissing('categories', ['id' => $category->id]);
+    }
+
+    public function test_storage_location_records_can_be_created_updated_and_deleted(): void
+    {
+        $this->actingAs(User::factory()->create());
+
+        $this->post('/storage-locations', [
+            'name' => 'Main Warehouse',
+            'address' => 'Building 4, Sector 12',
+            'is_active' => '1',
+        ])->assertRedirect('/storage-locations')
+            ->assertSessionHas('success_title', 'Storage Location Added');
+
+        $location = \App\Models\StorageLocation::where('name', 'Main Warehouse')->firstOrFail();
+        $this->assertSame('Building 4, Sector 12', $location->address);
+        $this->assertTrue($location->is_active);
+
+        $this->get('/storage-locations/'.$location->id.'/edit')->assertOk()->assertSee('data-confirm', false);
+        $this->get('/storage-locations')->assertOk()->assertSee('Main Warehouse')->assertSee('Building 4, Sector 12');
+
+        $this->put('/storage-locations/'.$location->id, [
+            'name' => 'Main Warehouse (Updated)',
+            'address' => 'Building 4, Sector 12 - Room 201',
+            'is_active' => '1',
+        ])->assertRedirect('/storage-locations')
+            ->assertSessionHas('success_title', 'Storage Location Updated');
+
+        $this->assertDatabaseHas('storage_locations', [
+            'id' => $location->id,
+            'name' => 'Main Warehouse (Updated)',
+            'address' => 'Building 4, Sector 12 - Room 201',
+        ]);
+
+        $this->from('/storage-locations/create')
+            ->post('/storage-locations', ['name' => '', 'address' => 'Test'])
+            ->assertRedirect('/storage-locations/create')
+            ->assertSessionHasErrors('name');
+
+        $this->delete('/storage-locations/'.$location->id)
+            ->assertRedirect('/storage-locations')
+            ->assertSessionHas('warning', 'The storage location “Main Warehouse (Updated)” was deleted.');
+
+        $this->assertDatabaseMissing('storage_locations', ['id' => $location->id]);
     }
 
     public function test_invalid_record_creation_shows_relevant_error_notification(): void

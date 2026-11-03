@@ -24,7 +24,17 @@
                 @endif
                 @if($navUser->hasPermission('materials.view'))
                 <a class="nav-link {{ request()->routeIs('materials.*') ? 'active' : '' }}" href="{{ route('materials.index') }}">
-                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 7 9 5 9-5v10l-9 5-9-5V7Z"/><path d="M12 12v10"/></svg></span>Materials
+                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 7 9 5 9-5v10l-9 5-9-5V7Z"/><path d="M12 12v10"/></svg></span>Raw Materials &amp; Packagings
+                </a>
+                @endif
+                @if($navUser->hasPermission('finished_goods.view'))
+                <a class="nav-link {{ request()->routeIs('finished-goods.*') ? 'active' : '' }}" href="{{ route('finished-goods.index') }}">
+                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg></span>Finished Goods
+                </a>
+                @endif
+                @if($navUser->hasPermission('semi_finished_goods.view'))
+                <a class="nav-link {{ request()->routeIs('semi-finished-goods.*') ? 'active' : '' }}" href="{{ route('semi-finished-goods.index') }}">
+                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 7 9 5 9-5"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg></span>Semi Finished Goods
                 </a>
                 @endif
                 @if($navUser->hasPermission('lots.view'))
@@ -34,7 +44,7 @@
                 @endif
                 @if($navUser->hasPermission('production.view'))
                 <a class="nav-link {{ request()->routeIs('production.*') ? 'active' : '' }}" href="{{ route('production.index') }}">
-                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M3 21V8l5-2v4l5-3v5l8-5v14H3Z"/><path d="M8 21v-5h5v5M6 3h3v3"/></svg></span>Production
+                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M3 21V8l5-2v4l5-3v5l8-5v14H3Z"/><path d="M8 21v-5h5v5M6 3h3v3"/></svg></span>Products
                 </a>
                 @endif
                 @if($navUser->hasPermission('purchases.view'))
@@ -50,6 +60,11 @@
                 @if($navUser->hasPermission('categories.view'))
                 <a class="nav-link {{ request()->routeIs('categories.*') ? 'active' : '' }}" href="{{ route('categories.index') }}">
                     <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-7.2-7.2a2 2 0 0 1 0-2.8l7.2-7.2A2 2 0 0 1 12 2.8h7a2 2 0 0 1 2 2v7a2 2 0 0 1-.4 1.6Z"/><circle cx="16.5" cy="7.5" r="1"/></svg></span>Categories
+                </a>
+                @endif
+                @if($navUser->hasPermission('storage_locations.view'))
+                <a class="nav-link {{ request()->routeIs('storage-locations.*') ? 'active' : '' }}" href="{{ route('storage-locations.index') }}">
+                    <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 21s-8-7.5-8-12a8 8 0 1 1 16 0c0 4.5-8 12-8 12Z"/><circle cx="12" cy="9" r="2.5"/></svg></span>Storage Locations
                 </a>
                 @endif
                 @if($navUser->hasPermission('movements.view') || $navUser->hasPermission('adjustments.create'))
@@ -116,7 +131,7 @@
                         <span class="account-profile-name">{{ $navUser->name }}</span>
                     </button>
                     <form method="POST" action="{{ route('logout') }}">@csrf
-                        <button class="account-signout-button" type="submit">
+                    <button class="account-signout-button" type="submit">
                             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 17l5-5-5-5M15 12H3"/><path d="M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></svg>
                             <span>Sign out</span>
                         </button>
@@ -139,13 +154,19 @@
                 <a class="mobile-nav-link {{ request()->routeIs('dashboard') ? 'active' : '' }}" href="{{ route('dashboard') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg><span>Dashboard</span></a>
             @endif
             @if($navUser->hasPermission('materials.view'))
-                <a class="mobile-nav-link {{ request()->routeIs('materials.*') ? 'active' : '' }}" href="{{ route('materials.index') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 7 9 5 9-5v10l-9 5-9-5V7Z"/></svg><span>Materials</span></a>
+                <a class="mobile-nav-link {{ request()->routeIs('materials.*') ? 'active' : '' }}" href="{{ route('materials.index') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 7 9 5 9-5v10l-9 5-9-5V7Z"/></svg><span>Raw Materials &amp; Packagings</span></a>
+            @endif
+            @if($navUser->hasPermission('finished_goods.view'))
+                <a class="mobile-nav-link {{ request()->routeIs('finished-goods.*') ? 'active' : '' }}" href="{{ route('finished-goods.index') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg><span>Finished Goods</span></a>
+            @endif
+            @if($navUser->hasPermission('semi_finished_goods.view'))
+                <a class="mobile-nav-link {{ request()->routeIs('semi-finished-goods.*') ? 'active' : '' }}" href="{{ route('semi-finished-goods.index') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m12 2 9 5-9 5-9-5 9-5Z"/><path d="m3 7 9 5 9-5"/><path d="m3 12 9 5 9-5"/><path d="m3 17 9 5 9-5"/></svg><span>Semi Finished</span></a>
             @endif
             @if($navUser->hasPermission('lots.view'))
                 <a class="mobile-nav-link {{ request()->routeIs('lots.*') ? 'active' : '' }}" href="{{ route('lots.index') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="15" height="16" rx="2"/><path d="M16 2v4M8 2v4M3 9h15"/><circle cx="17.5" cy="17.5" r="4.5"/><path d="M17.5 15v2.7l1.6 1"/></svg><span>Lots &amp; expiry</span></a>
             @endif
             @if($navUser->hasPermission('production.view'))
-                <a class="mobile-nav-link {{ request()->routeIs('production.*') ? 'active' : '' }}" href="{{ route('production.index') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V8l5-2v4l5-3v5l8-5v14H3Z"/><path d="M8 21v-5h5v5M6 3h3v3"/></svg><span>Production</span></a>
+                <a class="mobile-nav-link {{ request()->routeIs('production.*') ? 'active' : '' }}" href="{{ route('production.index') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21V8l5-2v4l5-3v5l8-5v14H3Z"/><path d="M8 21v-5h5v5M6 3h3v3"/></svg><span>Products</span></a>
             @endif
             @if($navUser->hasPermission('purchases.view'))
                 <a class="mobile-nav-link {{ request()->routeIs('purchases.*') ? 'active' : '' }}" href="{{ route('purchases.index') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 3h2l2.4 12.2a2 2 0 0 0 2 1.6h9.8a2 2 0 0 0 1.9-1.4L22 8H5"/><circle cx="9" cy="21" r="1"/><circle cx="19" cy="21" r="1"/></svg><span>Purchases</span></a>
@@ -155,6 +176,9 @@
             @endif
             @if($navUser->hasPermission('categories.view'))
                 <a class="mobile-nav-link {{ request()->routeIs('categories.*') ? 'active' : '' }}" href="{{ route('categories.index') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0l-7.2-7.2a2 2 0 0 1 0-2.8l7.2-7.2A2 2 0 0 1 12 2.8h7a2 2 0 0 1 2 2v7a2 2 0 0 1-.4 1.6Z"/><circle cx="16.5" cy="7.5" r="1"/></svg><span>Categories</span></a>
+            @endif
+            @if($navUser->hasPermission('storage_locations.view'))
+                <a class="mobile-nav-link {{ request()->routeIs('storage-locations.*') ? 'active' : '' }}" href="{{ route('storage-locations.index') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-8-7.5-8-12a8 8 0 1 1 16 0c0 4.5-8 12-8 12Z"/><circle cx="12" cy="9" r="2.5"/></svg><span>Locations</span></a>
             @endif
             @if($navUser->hasPermission('movements.view'))
                 <a class="mobile-nav-link {{ request()->routeIs('movements.*') ? 'active' : '' }}" href="{{ route('movements.index') }}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7h17l-4-4M21 17H4l4 4"/></svg><span>Stock movements</span></a>

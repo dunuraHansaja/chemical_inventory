@@ -41,8 +41,8 @@
                 <td>{{ $material->name }}</td>
                 <td>{{ $material->cas_number ?: '—' }}</td>
                 <td>{{ $material->category?->name ?? 'Uncategorized' }}</td>
-                <td>{{ number_format($onHand, 3) }} {{ $material->stock_unit }}</td>
-                <td>{{ number_format((float) $material->reorder_level, 3) }} {{ $material->stock_unit }}</td>
+                <td>{{ number_format($onHand, 2) }} {{ $material->stock_unit }}</td>
+                <td>{{ number_format((float) $material->reorder_level, 2) }} {{ $material->stock_unit }}</td>
                 <td>{{ $material->next_expiry_date ? \Illuminate\Support\Carbon::parse($material->next_expiry_date)->format('Y-m-d') : '—' }}</td>
                 <td>{{ $material->storage_location ?: $material->effective_storage_location ?: '—' }}</td>
                 <td>{{ $status }}</td>

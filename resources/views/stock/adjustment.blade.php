@@ -21,7 +21,7 @@
                         <option value="">Select a lot</option>
                         @foreach($lots as $lot)
                             <option value="{{ $lot->id }}" @selected(old('material_lot_id') == $lot->id)>
-                                {{ $lot->material->name }} · {{ $lot->lot_number }} — {{ number_format((float)$lot->quantity_on_hand, 3) }} {{ $lot->material->stock_unit }}
+                                {{ $lot->material->name }} · {{ $lot->lot_number }} — {{ number_format((float)$lot->quantity_on_hand, 2) }} {{ $lot->material->stock_unit }}
                             </option>
                         @endforeach
                     </select>
@@ -35,7 +35,7 @@
                 </label>
 
                 <label>Quantity <span class="required">*</span>
-                    <input type="number" name="quantity" min="0.001" step="0.001" value="{{ old('quantity') }}" placeholder="0.000" required>
+                    <input type="number" name="quantity" min="0.01" step="0.01" value="{{ old('quantity') }}" placeholder="0.00" required>
                 </label>
 
                 <label class="span-2">Reason / notes <span class="required">*</span>
