@@ -744,7 +744,7 @@
         <div class="material-grid">
             {{-- Hazard classes multi-select icons (12 cols) --}}
             <?php
-                $rawHazards = old('hazard_classes', $hazardClasses);
+                $rawHazards = old('hazard_classes', $hazardClasses ?? "");
                 $selectedHazardsList = collect(is_array($rawHazards) ? $rawHazards : explode(',', (string) $rawHazards))
                     ->map(fn ($h) => trim((string) $h))
                     ->filter()
@@ -862,7 +862,7 @@
                         <span class="hazard-selected-badge {{ count($selectedHazardsList) > 0 ? 'has-selection' : '' }}" id="hazard_selected_count">
                             {{ count($selectedHazardsList) }} selected
                         </span>
-                        <button type="button" class="hazard-clear-btn" id="hazard_clear_btn" style="{{ count($selectedHazardsList) > 0 ? '' : 'display: none;' }}">
+                        <button type="button" class="hazard-clear-btn" id="hazard_clear_btn" onclick="clearHazardClasses(event)" style="{{ count($selectedHazardsList) > 0 ? '' : 'display: none;' }}">
                             Clear all
                         </button>
                     </div>
@@ -881,6 +881,8 @@
                              data-hazard-name="{{ $hazard['name'] }}"
                              role="button"
                              tabindex="0"
+                             onclick="toggleHazardCard(this, event)"
+                             onkeydown="handleHazardCardKey(this, event)"
                              style="--hazard-accent: {{ $hazard['accent'] }}; --hazard-bg: {{ $hazard['bg'] }}; --hazard-icon-bg: {{ $hazard['icon_bg'] }}; --hazard-border: {{ $hazard['border'] }};">
                             <input type="checkbox"
                                    class="hazard-class-checkbox"
@@ -946,6 +948,65 @@
 </form>
 
 <script>
+window.syncHazardClasses = function() {
+    const selected = [];
+    document.querySelectorAll('[data-hazard-card]').forEach(function(card) {
+        const isSel = card.classList.contains('is-selected');
+        const name = card.getAttribute('data-hazard-name');
+        const cb = card.querySelector('[data-hazard-checkbox]');
+        if (cb) {
+            cb.checked = isSel;
+        }
+        if (isSel && name) {
+            selected.push(name);
+        }
+    });
+
+    const hazardHiddenInput = document.getElementById('hazard_classes');
+    const hazardCountBadge = document.getElementById('hazard_selected_count');
+    const hazardClearBtn = document.getElementById('hazard_clear_btn');
+
+    if (hazardHiddenInput) {
+        hazardHiddenInput.value = selected.join(', ');
+    }
+    if (hazardCountBadge) {
+        hazardCountBadge.textContent = selected.length + ' selected';
+        hazardCountBadge.classList.toggle('has-selection', selected.length > 0);
+    }
+    if (hazardClearBtn) {
+        hazardClearBtn.style.display = selected.length > 0 ? '' : 'none';
+    }
+};
+
+window.toggleHazardCard = function(card, event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    if (!card) return;
+    card.classList.toggle('is-selected');
+    window.syncHazardClasses();
+};
+
+window.handleHazardCardKey = function(card, event) {
+    if (event && (event.key === ' ' || event.key === 'Enter')) {
+        event.preventDefault();
+        event.stopPropagation();
+        window.toggleHazardCard(card);
+    }
+};
+
+window.clearHazardClasses = function(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    document.querySelectorAll('[data-hazard-card]').forEach(function(c) {
+        c.classList.remove('is-selected');
+    });
+    window.syncHazardClasses();
+};
+
 function initMaterialForm() {
     const formCard = document.querySelector('.material-form-card');
     const typeCards = document.querySelectorAll('[data-type-card]');
@@ -996,7 +1057,7 @@ function initMaterialForm() {
         } else {
             materialElements.forEach(el => el.style.display = '');
             productElements.forEach(el => el.style.setProperty('display', 'none', 'important'));
-            if (reorderMatGroup) reorderMatGroup.style.display = '');
+            if (reorderMatGroup) reorderMatGroup.style.display = '';
             if (stockUnitGroup) stockUnitGroup.className = 'form-group col-3';
             if (initialQtyGroup) initialQtyGroup.className = 'form-group col-3';
             if (reorderMatGroup) reorderMatGroup.className = 'form-group col-3';
@@ -1053,69 +1114,17 @@ function initMaterialForm() {
         });
     }
 
-    // Multi-select Hazard Classes
-    const hazardHiddenInput = document.getElementById('hazard_classes');
-    const hazardCountBadge = document.getElementById('hazard_selected_count');
-    const hazardClearBtn = document.getElementById('hazard_clear_btn');
+    // Direct event delegation on container as well
     const hazardGrid = document.querySelector('.hazard-classes-grid');
-
-    function syncHazardClasses() {
-        const selected = [];
-        document.querySelectorAll('[data-hazard-card]').forEach(card => {
-            const isSel = card.classList.contains('is-selected');
-            const name = card.getAttribute('data-hazard-name');
-            const cb = card.querySelector('[data-hazard-checkbox]');
-            if (cb) {
-                cb.checked = isSel;
-            }
-            if (isSel && name) {
-                selected.push(name);
-            }
-        });
-
-        if (hazardHiddenInput) {
-            hazardHiddenInput.value = selected.join(', ');
-        }
-        if (hazardCountBadge) {
-            hazardCountBadge.textContent = selected.length + ' selected';
-            hazardCountBadge.classList.toggle('has-selection', selected.length > 0);
-        }
-        if (hazardClearBtn) {
-            hazardClearBtn.style.display = selected.length > 0 ? '' : 'none';
-        }
-    }
-
     if (hazardGrid) {
         hazardGrid.addEventListener('click', function(e) {
             const card = e.target.closest('[data-hazard-card]');
             if (!card) return;
-            e.preventDefault();
-            card.classList.toggle('is-selected');
-            syncHazardClasses();
-        });
-
-        hazardGrid.addEventListener('keydown', function(e) {
-            if (e.key === ' ' || e.key === 'Enter') {
-                const card = e.target.closest('[data-hazard-card]');
-                if (!card) return;
-                e.preventDefault();
-                card.classList.toggle('is-selected');
-                syncHazardClasses();
-            }
+            window.toggleHazardCard(card, e);
         });
     }
 
-    if (hazardClearBtn) {
-        hazardClearBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            document.querySelectorAll('[data-hazard-card]').forEach(c => {
-                c.classList.remove('is-selected');
-            });
-            syncHazardClasses();
-        });
-    }
-
-    syncHazardClasses();
+    window.syncHazardClasses();
 }
 
 if (document.readyState === 'loading') {
